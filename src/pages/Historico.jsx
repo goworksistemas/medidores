@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useTheme } from '../contexts/ThemeContext'
 import { supabase } from '../supabaseClient'
-import { Calendar, Droplets, Zap, ExternalLink, Trash2, Edit2, X, Search, Filter, Building, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calendar, Droplets, Zap, ExternalLink, Trash2, Edit2, X, Search, Filter, Building, MapPin, ChevronLeft, ChevronRight, Plus, BarChart3, ChevronDown } from 'lucide-react'
 
 const VALOR_SEM_ANDAR = '___SEM_ANDAR___'
 const ITENS_POR_PAGINA = 20
 
 export default function Historico() {
-  const [tipoAtivo, setTipoAtivo] = useState('agua')
+  const { tipoAtivo, setTipoAtivo } = useTheme()
   
   // Dados e Estado da Tabela
   const [leituras, setLeituras] = useState([])
@@ -172,67 +174,122 @@ export default function Historico() {
   const handlePaginaProxima = () => setPaginaAtual(p => Math.min(totalPaginas, p + 1))
 
   return (
-    <div className="space-y-4 pb-24 animate-in fade-in">
-      
-      <div className="flex flex-col space-y-3 bg-white p-4 rounded-gowork shadow-sm border border-gray-100">
-        <h2 className="text-xl font-bold text-gray-800">Histórico Completo</h2>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 py-6 px-4 sm:py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Toggle Tipo */}
-        <div className="flex p-1 bg-gray-100 rounded-lg">
-          <button onClick={() => setTipoAtivo('agua')} className={`flex-1 py-2 text-xs font-bold uppercase rounded transition-all ${tipoAtivo === 'agua' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-400'}`}>Água</button>
-          <button onClick={() => setTipoAtivo('energia')} className={`flex-1 py-2 text-xs font-bold uppercase rounded transition-all ${tipoAtivo === 'energia' ? 'bg-white text-orange-700 shadow-sm' : 'text-gray-400'}`}>Energia</button>
+        {/* Header com Navegação */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Histórico Completo</h1>
+              <p className="text-sm text-gray-600 mt-1">Visualize e gerencie todos os registros de leitura</p>
+            </div>
+            
+            {/* Botões Água e Energia + Navegação Desktop */}
+            <div className="flex flex-col items-center sm:flex-row gap-3 sm:items-center justify-center sm:justify-end">
+              {/* Tabs Modernos */}
+              <div className="inline-flex bg-white rounded-2xl p-1.5 shadow-lg border border-gray-200">
+                <button
+                  onClick={() => setTipoAtivo('agua')}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    tipoAtivo === 'agua'
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Droplets className="w-5 h-5" />
+                  <span className="hidden sm:inline">Água</span>
+                </button>
+                <button
+                  onClick={() => setTipoAtivo('energia')}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    tipoAtivo === 'energia'
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/30'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Zap className="w-5 h-5" />
+                  <span className="hidden sm:inline">Energia</span>
+                </button>
+              </div>
+
+              {/* Navegação Desktop - Leitura e Gráficos */}
+              <div className="hidden md:flex gap-2">
+                <Link to="/" className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 rounded-xl font-semibold hover:bg-gray-100 border-2 border-gray-200 transition-all shadow-md">
+                  <Plus className="w-5 h-5" />
+                  Leitura
+                </Link>
+                <Link to="/dashboard" className="flex items-center gap-2 px-4 py-3 bg-white text-gray-700 rounded-xl font-semibold hover:bg-gray-100 border-2 border-gray-200 transition-all shadow-md">
+                  <BarChart3 className="w-5 h-5" />
+                  Gráficos
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* --- FILTROS (Agora Server-Side) --- */}
-        <div className="space-y-2 pt-2 border-t border-gray-100">
+        {/* Card de Filtros */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Filter className="w-5 h-5" />
+            Filtros e Busca
+          </h2>
           
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Buscar (Enter para pesquisar)..." 
-              className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-gray-50"
-              value={termoBusca}
-              onChange={e => {
-                setTermoBusca(e.target.value)
-                setPaginaAtual(1) // Volta pra pagina 1 ao filtrar
-              }}
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-               <Building className="absolute left-2 top-2.5 w-3 h-3 text-gray-400 pointer-events-none" />
-               <select 
-                 className="w-full pl-7 pr-6 py-2 rounded-lg border border-gray-200 text-xs h-10 bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary truncate"
-                 value={filtroUnidade}
-                 onChange={e => {
-                   setFiltroUnidade(e.target.value)
-                   setFiltroAndar('') 
-                   setPaginaAtual(1)
-                 }}
-               >
-                 <option value="">Todas Unidades</option>
-                 {opcoesUnidades.map(u => <option key={u} value={u}>{u}</option>)}
-               </select>
-               <Filter className="absolute right-2 top-3 w-3 h-3 text-gray-300 pointer-events-none" />
+          <div className="space-y-4">
+            {/* Campo de Busca */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input 
+                type="text" 
+                placeholder="Buscar medidor..." 
+                className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-gray-200 text-sm focus:outline-none focus:border-blue-500 focus:bg-white bg-gray-50 transition-all"
+                value={termoBusca}
+                onChange={e => {
+                  setTermoBusca(e.target.value)
+                  setPaginaAtual(1)
+                }}
+              />
             </div>
 
-            <div className={`relative flex-1 transition-opacity ${!filtroUnidade ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-               <MapPin className="absolute left-2 top-2.5 w-3 h-3 text-gray-400 pointer-events-none" />
-               <select 
-                 className="w-full pl-7 pr-6 py-2 rounded-lg border border-gray-200 text-xs h-10 bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary truncate"
-                 value={filtroAndar}
-                 onChange={e => {
-                   setFiltroAndar(e.target.value)
-                   setPaginaAtual(1)
-                 }}
-                 disabled={!filtroUnidade}
-               >
-                 <option value="">Todos Andares</option>
-                 {opcoesAndares.map(op => <option key={op.valor} value={op.valor}>{op.label}</option>)}
-               </select>
-               <Filter className="absolute right-2 top-3 w-3 h-3 text-gray-300 pointer-events-none" />
+            {/* Grid dos Selects */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              {/* Select Unidade */}
+              <div className="relative">
+                <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <select 
+                  className="w-full pl-10 pr-10 py-3 rounded-xl border-2 border-gray-200 text-sm bg-gray-50 focus:outline-none focus:border-blue-500 focus:bg-white appearance-none cursor-pointer transition-all"
+                  value={filtroUnidade}
+                  onChange={e => {
+                    setFiltroUnidade(e.target.value)
+                    setFiltroAndar('') 
+                    setPaginaAtual(1)
+                  }}
+                >
+                  <option value="">Todas as Unidades</option>
+                  {opcoesUnidades.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
+
+              {/* Select Andar */}
+              <div className={`relative transition-opacity duration-200 ${!filtroUnidade ? 'opacity-50 pointer-events-none' : ''}`}>
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <select 
+                  className="w-full pl-10 pr-10 py-3 rounded-xl border-2 border-gray-200 text-sm bg-gray-50 focus:outline-none focus:border-blue-500 focus:bg-white appearance-none cursor-pointer disabled:cursor-not-allowed transition-all"
+                  value={filtroAndar}
+                  onChange={e => {
+                    setFiltroAndar(e.target.value)
+                    setPaginaAtual(1)
+                  }}
+                  disabled={!filtroUnidade}
+                >
+                  <option value="">Todos os Andares</option>
+                  {opcoesAndares.map(op => <option key={op.valor} value={op.valor}>{op.label}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
+              
             </div>
           </div>
         </div>
@@ -291,7 +348,11 @@ export default function Historico() {
                           <ExternalLink className="w-4 h-4" />
                         </a>
                       )}
-                      <button onClick={() => abrirEdicao(item)} className="p-2 text-blue-500 bg-blue-50 rounded-lg hover:bg-blue-100 border border-blue-100">
+                      <button onClick={() => abrirEdicao(item)} className={`p-2 rounded-lg border transition-colors ${
+                        tipoAtivo === 'agua'
+                          ? 'text-blue-500 bg-blue-50 hover:bg-blue-100 border-blue-100'
+                          : 'text-orange-500 bg-orange-50 hover:bg-orange-100 border-orange-100'
+                      }`}>
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button onClick={() => deletarLeitura(item.id_registro)} className="p-2 text-red-500 bg-red-50 rounded-lg hover:bg-red-100 border border-red-100">
