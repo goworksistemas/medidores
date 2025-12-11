@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTheme } from '../contexts/ThemeContext'
 import { supabase } from '../supabaseClient'
 import { Camera, CheckCircle, Trash2, AlertTriangle, TrendingUp, Droplets, Zap, Building, MapPin, ArrowRight, Info, BarChart3, History, ChevronDown } from 'lucide-react'
+import CustomSelect from '../components/CustomSelect'
 
 // CONFIGURAÇÕES
 const N8N_WEBHOOK_URL = ''
@@ -322,77 +323,53 @@ export default function Leitura() {
               
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {/* Unidade */}
-                <div className="space-y-2 relative z-10">
+                <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700">
                     Unidade (Prédio)
                   </label>
-                  <div className="relative isolate">
-                    <Building className="absolute left-3 top-3.5 w-4 h-4 text-gray-400 pointer-events-none z-[1]" />
-                    <select
-                      className={`w-full pl-10 pr-10 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:z-[100] appearance-none cursor-pointer transition-colors ${tipoAtivo === 'agua' ? 'focus:border-blue-500' : 'focus:border-orange-500'}`}
-                      value={predioSelecionado}
-                      onChange={(e) => {
-                        setPredioSelecionado(e.target.value)
-                        setAndarSelecionado('')
-                        setMedidorSelecionado('')
-                      }}
-                    >
-                      <option value="">Selecione...</option>
-                      {prediosUnicos.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-[1]" />
-                  </div>
+                  <CustomSelect
+                    value={predioSelecionado}
+                    onChange={(val) => {
+                      setPredioSelecionado(val)
+                      setAndarSelecionado('')
+                      setMedidorSelecionado('')
+                    }}
+                    options={prediosUnicos.map(p => ({ value: p, label: p }))}
+                    placeholder="Selecione..."
+                    icon={Building}
+                  />
                 </div>
 
                 {/* Andar */}
-                <div className="space-y-2 relative z-10">
+                <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700">
                     Andar / Setor
                   </label>
-                  <div className="relative isolate">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-[1]" />
-                    <select
-                      className={`w-full pl-10 pr-10 py-3 rounded-xl focus:outline-none focus:z-[100] appearance-none cursor-pointer transition-colors ${
-                        !predioSelecionado
-                          ? 'bg-gray-100 border-2 border-gray-200 text-gray-400 cursor-not-allowed'
-                          : `bg-gray-50 border-2 border-gray-200 focus:bg-white ${tipoAtivo === 'agua' ? 'focus:border-blue-500' : 'focus:border-orange-500'}`
-                      }`}
-                      value={andarSelecionado}
-                      onChange={(e) => { setAndarSelecionado(e.target.value); setMedidorSelecionado('') }}
-                      disabled={!predioSelecionado}
-                    >
-                      <option value="">Selecione...</option>
-                      {andaresOpcoes.map(opcao => (
-                        <option key={opcao.valor} value={opcao.valor}>{opcao.label}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-[1]" />
-                  </div>
+                  <CustomSelect
+                    value={andarSelecionado}
+                    onChange={(val) => {
+                      setAndarSelecionado(val)
+                      setMedidorSelecionado('')
+                    }}
+                    options={andaresOpcoes.map(a => ({ value: a.valor, label: a.label }))}
+                    placeholder="Selecione..."
+                    disabled={!predioSelecionado}
+                    icon={MapPin}
+                  />
                 </div>
 
                 {/* Medidor */}
-                <div className="space-y-2 sm:col-span-2 md:col-span-1 relative z-10">
+                <div className="space-y-2 sm:col-span-2 md:col-span-1">
                   <label className="block text-sm font-semibold text-gray-700">
                     Medidor
                   </label>
-                  <div className="relative isolate">
-                    <select
-                      className={`w-full pl-4 pr-10 py-3 rounded-xl focus:outline-none focus:z-[100] appearance-none cursor-pointer transition-colors ${
-                        !andarSelecionado
-                          ? 'bg-gray-100 border-2 border-gray-200 text-gray-400 cursor-not-allowed'
-                          : tipoAtivo === 'agua'
-                          ? 'bg-blue-50 border-2 border-blue-300 focus:border-blue-500 font-semibold text-blue-900'
-                          : 'bg-orange-50 border-2 border-orange-300 focus:border-orange-500 font-semibold text-orange-900'
-                      }`}
-                      value={medidorSelecionado}
-                      onChange={(e) => setMedidorSelecionado(e.target.value)}
-                      disabled={!andarSelecionado}
-                    >
-                      <option value="">Qual medidor?</option>
-                      {medidoresFinais.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none z-[1]" style={{ color: !andarSelecionado ? '#9ca3af' : (tipoAtivo === 'agua' ? '#1e3a8a' : '#92400e') }} />
-                  </div>
+                  <CustomSelect
+                    value={medidorSelecionado}
+                    onChange={(val) => setMedidorSelecionado(val)}
+                    options={medidoresFinais.map(m => ({ value: m.id, label: m.nome }))}
+                    placeholder="Qual medidor?"
+                    disabled={!andarSelecionado}
+                  />
                 </div>
               </div>
             </div>

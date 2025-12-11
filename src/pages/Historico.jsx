@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTheme } from '../contexts/ThemeContext'
 import { supabase } from '../supabaseClient'
 import { Calendar, Droplets, Zap, ExternalLink, Trash2, Edit2, X, Search, Filter, Building, MapPin, ChevronLeft, ChevronRight, Plus, BarChart3, ChevronDown } from 'lucide-react'
+import CustomSelect from '../components/CustomSelect'
 
 const VALOR_SEM_ANDAR = '___SEM_ANDAR___'
 const ITENS_POR_PAGINA = 20
@@ -24,6 +25,10 @@ export default function Historico() {
   // Dados para os Selects de Filtro (Carregados do cadastro)
   const [opcoesUnidades, setOpcoesUnidades] = useState([])
   const [opcoesAndares, setOpcoesAndares] = useState([]) // Baseado na unidade
+  
+  // Converter opções para formato do CustomSelect
+  const unidadesFormatadas = opcoesUnidades.map(u => ({ value: u, label: u }))
+  const andaresFormatadas = opcoesAndares.map(a => ({ value: a.valor, label: a.label }))
 
   // Estados Edição
   const [editandoItem, setEditandoItem] = useState(null)
@@ -255,40 +260,30 @@ export default function Historico() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               
               {/* Select Unidade */}
-              <div className="relative">
-                <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                <select 
-                  className="w-full pl-10 pr-10 py-3 rounded-xl border-2 border-gray-200 text-sm bg-gray-50 focus:outline-none focus:border-blue-500 focus:bg-white appearance-none cursor-pointer transition-all"
-                  value={filtroUnidade}
-                  onChange={e => {
-                    setFiltroUnidade(e.target.value)
-                    setFiltroAndar('') 
-                    setPaginaAtual(1)
-                  }}
-                >
-                  <option value="">Todas as Unidades</option>
-                  {opcoesUnidades.map(u => <option key={u} value={u}>{u}</option>)}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
+              <CustomSelect
+                value={filtroUnidade}
+                onChange={(val) => {
+                  setFiltroUnidade(val)
+                  setFiltroAndar('')
+                  setPaginaAtual(1)
+                }}
+                options={unidadesFormatadas}
+                placeholder="Todas as Unidades"
+                icon={Building}
+              />
 
               {/* Select Andar */}
-              <div className={`relative transition-opacity duration-200 ${!filtroUnidade ? 'opacity-50 pointer-events-none' : ''}`}>
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                <select 
-                  className="w-full pl-10 pr-10 py-3 rounded-xl border-2 border-gray-200 text-sm bg-gray-50 focus:outline-none focus:border-blue-500 focus:bg-white appearance-none cursor-pointer disabled:cursor-not-allowed transition-all"
-                  value={filtroAndar}
-                  onChange={e => {
-                    setFiltroAndar(e.target.value)
-                    setPaginaAtual(1)
-                  }}
-                  disabled={!filtroUnidade}
-                >
-                  <option value="">Todos os Andares</option>
-                  {opcoesAndares.map(op => <option key={op.valor} value={op.valor}>{op.label}</option>)}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
+              <CustomSelect
+                value={filtroAndar}
+                onChange={(val) => {
+                  setFiltroAndar(val)
+                  setPaginaAtual(1)
+                }}
+                options={andaresFormatadas}
+                placeholder="Todos os Andares"
+                disabled={!filtroUnidade}
+                icon={MapPin}
+              />
               
             </div>
           </div>
