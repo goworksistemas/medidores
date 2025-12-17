@@ -1,19 +1,36 @@
-import { Outlet, useNavigate } from 'react-router-dom' // <--- useNavigate adicionado
+import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useTheme } from '../contexts/ThemeContext'
-import { useAuth } from '../contexts/AuthContext' // <--- useAuth adicionado
-import { LogOut } from 'lucide-react' // <--- Ícone novo
+import { useAuth } from '../contexts/AuthContext'
+import { LogOut, LayoutDashboard, List, PlusSquare } from 'lucide-react'
 import BottomMenu from './BottomMenu'
 import ChuvaAnimation from './ChuvaAnimation'
 import RaiosAnimation from './RaiosAnimation'
 
 export default function Layout() {
   const { tipoAtivo } = useTheme()
-  const { logout, user } = useAuth() // <--- Pega função de logout e dados do usuário
+  const { logout, user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleLogout = () => {
-    logout() // Limpa o token e o estado
-    navigate('/login') // Força a ida para o login
+    logout()
+    navigate('/login')
+  }
+
+  // Função para saber qual link está ativo e mudar a cor
+  const getLinkClass = (path) => {
+    const isActive = location.pathname === path
+    const baseClass = "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+    
+    if (tipoAtivo === 'agua') {
+      return isActive 
+        ? "bg-white/20 text-white shadow-sm" 
+        : "text-blue-100 hover:bg-white/10 hover:text-white"
+    } else {
+      return isActive 
+        ? "bg-yellow-600/20 text-yellow-900 shadow-sm" 
+        : "text-yellow-800/70 hover:bg-yellow-600/10 hover:text-yellow-900"
+    }
   }
 
   return (
@@ -22,40 +39,58 @@ export default function Layout() {
         ? 'bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100'
         : 'bg-gradient-to-br from-slate-50 via-yellow-50/30 to-slate-100'
     }`}>
-      {/* Top Bar - Responsivo */}
+      
+      {/* HEADER SUPERIOR (DESKTOP) */}
       <header className={`shadow-lg sticky top-0 z-40 transition-all relative ${
         tipoAtivo === 'agua'
           ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white'
           : 'bg-gradient-to-r from-yellow-300 to-yellow-400 text-yellow-900'
-
       }`}>
-        {/* Animação - Chuva para Água, Raios para Energia */}
+        
+        {/* Animação de fundo */}
         {tipoAtivo === 'agua' ? <ChuvaAnimation /> : <RaiosAnimation />}
         
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between relative z-10">
-          <div>
-            <h1 className={`text-2xl sm:text-3xl font-bold tracking-wide transition-colors ${
-              tipoAtivo === 'agua' ? 'text-white' : 'text-yellow-700'
-            }`}>
-              GOWORK
-            </h1>
-            <p className={`text-xs sm:text-sm uppercase tracking-wider mt-1 transition-colors ${
-              tipoAtivo === 'agua' ? 'text-white opacity-90' : 'text-yellow-800 opacity-90'
-            }`}>
-              {user?.nome || 'Gestão de Utilidades'} {/* Mostra o nome da equipe logada */}
-            </p>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between relative z-10">
+          
+          {/* Logo e Título */}
+          <div className="flex items-center gap-8">
+            <div>
+              <h1 className={`text-2xl font-bold tracking-wide transition-colors ${
+                tipoAtivo === 'agua' ? 'text-white' : 'text-yellow-700'
+              }`}>
+                GOWORK
+              </h1>
+              <p className={`text-[10px] sm:text-xs uppercase tracking-wider opacity-90 ${
+                tipoAtivo === 'agua' ? 'text-blue-100' : 'text-yellow-800'
+              }`}>
+                {user?.nome || 'Gestão de Utilidades'}
+              </p>
+            </div>
+
+            {/* MENU DE NAVEGAÇÃO (Visível apenas Desktop) */}
+            <nav className="hidden md:flex items-center gap-2">
+              <Link to="/leitura" className={getLinkClass('/leitura')}>
+                <PlusSquare className="w-4 h-4" /> Nova Leitura
+              </Link>
+              <Link to="/historico" className={getLinkClass('/historico')}>
+                <List className="w-4 h-4" /> Histórico
+              </Link>
+              <Link to="/dashboard" className={getLinkClass('/dashboard')}>
+                <LayoutDashboard className="w-4 h-4" /> Dashboard
+              </Link>
+            </nav>
           </div>
 
+          {/* Lado Direito: Perfil e Logout */}
           <div className="flex items-center gap-3">
-            <div className={`text-xs sm:text-sm px-4 py-2 rounded-full font-semibold transition-all hidden sm:block ${
+            <div className={`text-xs px-3 py-1 rounded-full font-semibold border ${
               tipoAtivo === 'agua'
-                ? 'bg-white/20 text-white'
-                : 'bg-yellow-600/20 text-yellow-800'
+                ? 'bg-blue-700/30 border-blue-400/30 text-white'
+                : 'bg-yellow-600/10 border-yellow-600/20 text-yellow-800'
             }`}>
               {user?.role === 'n1' ? 'Operacional' : 'Admin'}
             </div>
 
-            {/* BOTÃO DE SAIR */}
             <button 
               onClick={handleLogout}
               className={`p-2 rounded-full transition-all hover:scale-110 ${
@@ -71,12 +106,12 @@ export default function Layout() {
         </div>
       </header>
 
-      {/* Conteúdo das Páginas - Responsivo */}
-      <main className="min-h-screen md:min-h-[calc(100vh-120px)] transition-all">
+      {/* CONTEÚDO DA PÁGINA */}
+      <main className="min-h-[calc(100vh-80px)] transition-all">
         <Outlet />
       </main>
 
-      {/* Menu Inferior - Apenas Mobile */}
+      {/* MENU INFERIOR (Visível apenas Mobile) */}
       <div className="md:hidden">
         <BottomMenu />
       </div>
