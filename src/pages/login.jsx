@@ -82,7 +82,10 @@ export default function Login() {
     
     if (res.success) {
       setSucesso('Login realizado! Redirecionando...')
-      // O redirecionamento acontece via useEffect quando user mudar
+      // Timeout de segurança: se não redirecionar em 5s, libera o loading
+      setTimeout(() => {
+        setLoading(false)
+      }, 5000)
     } else {
       setErro(res.message || 'Erro ao fazer login. Verifique suas credenciais.')
       setLoading(false)
@@ -102,7 +105,10 @@ export default function Login() {
       
       if (res.success) {
         setSucesso('QR Code validado! Redirecionando...')
-        // O redirecionamento acontece via useEffect quando user mudar
+        // Timeout de segurança: se não redirecionar em 5s, libera o loading
+        setTimeout(() => {
+          setLoading(false)
+        }, 5000)
       } else {
         setErro('QR Code não reconhecido no sistema.')
         setLoading(false)

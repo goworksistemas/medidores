@@ -17,9 +17,9 @@ export function AuthProvider({ children }) {
         console.log('[Auth] Evento:', event)
         
         if (session?.user) {
-          // Busca dados do profile de forma síncrona para evitar flicker
-          // Usando setTimeout(0) para evitar deadlock com Supabase
-          setTimeout(async () => {
+          // Busca dados do profile
+          // Usando Promise com timeout para evitar travamento em mobile
+          const buscarProfile = async () => {
             try {
               const { data: profileData, error } = await supabase
                 .from('profiles')
@@ -55,7 +55,18 @@ export function AuthProvider({ children }) {
             } finally {
               setLoading(false)
             }
-          }, 0)
+          }
+          
+          // Executa a busca do profile com um pequeno delay para evitar deadlock
+          // Usa requestAnimationFrame quando disponível (melhor para mobile)
+          if (typeof requestAnimationFrame !== 'undefined') {
+            requestAnimationFrame(() => {
+              buscarProfile()
+            })
+          } else {
+            // Fallback para setTimeout
+            setTimeout(buscarProfile, 10)
+          }
         } else {
           // Sem sessão Supabase - verifica token QR Code
           const tokenSalvo = localStorage.getItem('gowork_token_n1')
