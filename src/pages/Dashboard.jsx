@@ -4,7 +4,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { supabase } from '../supabaseClient'
 import { 
   AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList
 } from 'recharts'
 import { 
   Zap, Droplets, TrendingUp, History, 
@@ -26,97 +26,6 @@ const PERIODOS_OPCOES = [
   { value: 0, label: 'Personalizado' },
 ]
 
-// Parser robusto para dados concatenados (igual ao Histórico)
-function parseDadosConcatenados(identificador_relogio) {
-  if (!identificador_relogio) return null
-  
-  const str = String(identificador_relogio)
-  
-  // Se não contém vírgula, é um dado simples
-  if (!str.includes(',')) {
-    return { nomeMedidor: str }
-  }
-  
-  try {
-    // Encontra onde começa o JSON (se houver)
-    const jsonStartIndex = str.indexOf('[{')
-    const jsonEndIndex = str.lastIndexOf('}]')
-    
-    let parteAntes = str
-    let fotoUrl = null
-    
-    if (jsonStartIndex !== -1 && jsonEndIndex !== -1) {
-      parteAntes = str.substring(0, jsonStartIndex)
-      const jsonStr = str.substring(jsonStartIndex, jsonEndIndex + 2)
-      try {
-        const jsonData = JSON.parse(jsonStr)
-        if (Array.isArray(jsonData) && jsonData[0]?.link) {
-          fotoUrl = jsonData[0].link
-        }
-      } catch (e) {}
-    }
-    
-    // Split da parte antes do JSON
-    const partes = parteAntes.split(',').map(p => p.trim()).filter(Boolean)
-    
-    if (partes.length >= 4) {
-      const nomeMedidor = partes[0] || ''
-      
-      // Encontra valores numéricos
-      let leituraAtual = 0
-      let consumo = 0
-      let data = null
-      
-      for (let i = 1; i < partes.length; i++) {
-        const parte = partes[i]
-        
-        // Verifica se é data (YYYY-MM-DD)
-        if (/^\d{4}-\d{2}-\d{2}$/.test(parte)) {
-          if (!data) data = parte
-          continue
-        }
-        
-        // Verifica se é número puro (leitura ou consumo)
-        const numVal = parseFloat(parte)
-        if (!isNaN(numVal) && parte.match(/^\d+(\.\d+)?$/)) {
-          if (leituraAtual === 0) {
-            leituraAtual = numVal
-          } else if (consumo === 0) {
-            consumo = numVal
-          }
-        }
-      }
-      
-      return { nomeMedidor, leituraAtual, consumo, data, fotoUrl }
-    }
-    
-    return { nomeMedidor: partes[0] || str }
-  } catch (e) {
-    return { nomeMedidor: str }
-  }
-}
-
-// Extrai nome limpo do medidor
-function extrairNomeMedidor(identificador) {
-  const parsed = parseDadosConcatenados(identificador)
-  return parsed?.nomeMedidor || identificador || 'Desconhecido'
-}
-
-// Extrai consumo dos dados
-function extrairConsumo(row, colunaConsumo) {
-  // Primeiro tenta o campo específico
-  if (row[colunaConsumo] !== undefined && row[colunaConsumo] !== null) {
-    const val = parseFloat(String(row[colunaConsumo]).replace(',', '.'))
-    if (!isNaN(val) && val > 0) return val
-  }
-  
-  // Tenta extrair do identificador concatenado
-  const parsed = parseDadosConcatenados(row.identificador_relogio)
-  if (parsed?.consumo && parsed.consumo > 0) return parsed.consumo
-  
-  return 0
-}
-
 // Tooltip customizado
 const CustomTooltip = ({ active, payload, label, tipo }) => {
   if (active && payload && payload.length) {
@@ -136,7 +45,6 @@ const CustomTooltip = ({ active, payload, label, tipo }) => {
 export default function Dashboard() {
   const { tipoAtivo, setTipoAtivo } = useTheme()
   const [loading, setLoading] = useState(true)
-  const [rawData, setRawData] = useState([])
   const [allData, setAllData] = useState([])
   
   // Filtros
@@ -167,78 +75,121 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchDashboard() {
-      setLoading(true)
-      
-      const tabela = tipoAtivo === 'agua' ? 'med_hidrometros' : 'med_energia'
-      const colunaConsumo = tipoAtivo === 'agua' ? 'gasto_diario' : 'variacao'
-      
-      let query = supabase
-        .from(tabela)
-        .select(`identificador_relogio, ${colunaConsumo}, data_hora, apenas_data, unidade, andar, created_at`)
-        .order('created_at', { ascending: true, nullsFirst: false })
-      
-      // Filtro de data
-      if (dataCorteStr) {
-        query = query.gte('created_at', `${dataCorteStr}T00:00:00`)
-      }
-      if (dataFimStr) {
-        query = query.lte('created_at', `${dataFimStr}T23:59:59`)
-      }
+      setLoading(true);
 
-      const { data, error } = await query
+      const tabela = tipoAtivo === 'agua' ? 'med_hidrometros' : 'med_energia'
+
+      // 1. Busca todas as leituras no período, com informações do medidor
+      const { data: leiturasNoPeriodo, error } = await supabase
+        .from(tabela)
+        .select('leitura, created_at, medidor:med_medidores(id, nome, local_unidade, andar)')
+        .gte('created_at', `${dataCorteStr}T00:00:00Z`)
+        .lte('created_at', `${dataFimStr}T23:59:59Z`)
+        .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('Erro ao buscar dados:', error)
-        setLoading(false)
-        return
+        console.error('Erro ao buscar dados do dashboard:', error);
+        setAllData([]);
+        setLoading(false);
+        return;
       }
 
-      // Processa dados
-      const dadosProcessados = (data || []).map(row => {
-        const consumo = extrairConsumo(row, colunaConsumo)
-        const nomeMedidor = extrairNomeMedidor(row.identificador_relogio)
-        const parsed = parseDadosConcatenados(row.identificador_relogio)
-        
-        // Extrai data válida
-        let dataRegistro = row.apenas_data || parsed?.data || row.created_at || row.data_hora
-        
-        return {
-          ...row,
-          consumo,
-          nomeMedidor,
-          dataRegistro,
-          unidadeOriginal: row.unidade || 'Geral'
+      // 2. Agrupa as leituras por medidor
+      const leiturasPorMedidor = (leiturasNoPeriodo || []).reduce((acc, curr) => {
+        if (!curr.medidor) return acc;
+        const medidorId = curr.medidor.id;
+        if (!acc[medidorId]) {
+          acc[medidorId] = [];
         }
-      }).filter(d => d.consumo > 0)
+        acc[medidorId].push(curr);
+        return acc;
+      }, {});
 
-      // Extrai opções únicas
-      const unidades = [...new Set(dadosProcessados.map(d => d.unidadeOriginal).filter(Boolean))].sort()
-      const andares = [...new Set(dadosProcessados.map(d => d.andar).filter(Boolean))].sort()
-      setOpcoesUnidades(unidades)
-      setOpcoesAndares(andares)
+      // 3. Busca a última leitura ANTERIOR ao período para cada medidor
+      const medidorIds = Object.keys(leiturasPorMedidor);
+      const promisesLeiturasAnteriores = medidorIds.map(id =>
+        supabase
+          .from(tabela)
+          .select('leitura, medidor_id')
+          .eq('medidor_id', id)
+          .lt('created_at', `${dataCorteStr}T00:00:00Z`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      );
       
-      setAllData(dadosProcessados)
-      setLoading(false)
+      const resultadosAnteriores = await Promise.all(promisesLeiturasAnteriores);
+      const mapaLeiturasAnteriores = resultadosAnteriores.reduce((acc, res) => {
+        if (res.data) {
+          acc[res.data.medidor_id] = res.data;
+        }
+        return acc;
+      }, {});
+
+      // 4. Calcula o consumo para cada leitura no período
+      const consumosCalculados = [];
+      for (const medidorId in leiturasPorMedidor) {
+        const leiturasDoMedidor = leiturasPorMedidor[medidorId];
+        let leituraDeReferencia = mapaLeiturasAnteriores[medidorId]?.leitura;
+
+        for (let i = 0; i < leiturasDoMedidor.length; i++) {
+          const leituraAtual = leiturasDoMedidor[i];
+          let consumo = 0; // O padrão é 0 se não houver referência
+
+          // Só calcula o consumo se houver uma leitura anterior para comparar
+          if (leituraDeReferencia !== undefined) {
+            const consumoCalculado = Number(leituraAtual.leitura) - Number(leituraDeReferencia);
+            // Apenas considera consumos positivos para evitar problemas com "virada" de medidor
+            if (consumoCalculado >= 0) {
+              consumo = consumoCalculado;
+            }
+          }
+
+          consumosCalculados.push({
+            consumo: consumo,
+            dataRegistro: leituraAtual.created_at.split('T')[0],
+            nomeMedidor: leituraAtual.medidor.nome,
+            local_unidade: leituraAtual.medidor.local_unidade,
+            andar: leituraAtual.medidor.andar,
+          });
+
+          // Atualiza a referência para a próxima iteração
+          leituraDeReferencia = leituraAtual.leitura;
+        }
+      }
+
+      setAllData(consumosCalculados);
+      setLoading(false);
     }
 
+    async function fetchFilterOptions() {
+      const { data } = await supabase
+        .from('med_medidores')
+        .select('local_unidade, andar')
+        .eq('tipo', tipoAtivo);
+
+      if (data) {
+        const unidades = [...new Set(data.map(d => d.local_unidade).filter(Boolean))].sort();
+        const andares = [...new Set(data.map(d => d.andar).filter(Boolean))].sort();
+        setOpcoesUnidades(unidades);
+        setOpcoesAndares(andares);
+      }
+    }
     fetchDashboard()
+    fetchFilterOptions()
   }, [tipoAtivo, dataCorteStr, dataFimStr])
 
   // Aplica filtros
-  const rawDataFiltrado = useMemo(() => {
-    let dados = [...allData]
+  const rawData = useMemo(() => {
+    let dados = allData
     if (filtroUnidade) {
-      dados = dados.filter(d => d.unidadeOriginal === filtroUnidade)
+      dados = dados.filter(d => d.local_unidade === filtroUnidade)
     }
     if (filtroAndar) {
       dados = dados.filter(d => d.andar === filtroAndar)
     }
     return dados
   }, [allData, filtroUnidade, filtroAndar])
-
-  useEffect(() => {
-    setRawData(rawDataFiltrado)
-  }, [rawDataFiltrado])
 
   // Limpar filtros
   const limparFiltros = () => {
@@ -312,9 +263,9 @@ export default function Dashboard() {
   // Distribuição por Unidade
   const dadosPorUnidade = useMemo(() => {
     const agrupado = {}
-    
+
     rawData.forEach(curr => {
-      const unidade = curr.unidadeOriginal || 'Outros'
+      const unidade = curr.local_unidade || 'Outros'
       if (!agrupado[unidade]) agrupado[unidade] = 0
       agrupado[unidade] += curr.consumo
     })
@@ -329,6 +280,23 @@ export default function Dashboard() {
       .slice(0, 8) // Top 8 para não poluir
   }, [rawData])
 
+  // Distribuição por Andar (NOVO GRÁFICO)
+  const dadosPorAndar = useMemo(() => {
+    const agrupado = {};
+    rawData.forEach(curr => {
+      const andar = curr.andar || 'N/A';
+      if (!agrupado[andar]) {
+        agrupado[andar] = 0;
+      }
+      agrupado[andar] += curr.consumo;
+    });
+
+    return Object.entries(agrupado)
+      .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8); // Top 8
+  }, [rawData]);
+
   // Top Medidores (agrupado)
   const topMedidores = useMemo(() => {
     const agrupado = {}
@@ -336,7 +304,7 @@ export default function Dashboard() {
     rawData.forEach(curr => {
       const nome = curr.nomeMedidor
       if (!agrupado[nome]) {
-        agrupado[nome] = { total: 0, count: 0, unidade: curr.unidadeOriginal }
+        agrupado[nome] = { total: 0, count: 0, unidade: curr.local_unidade }
       }
       agrupado[nome].total += curr.consumo
       agrupado[nome].count += 1
@@ -612,14 +580,14 @@ export default function Dashboard() {
             </div>
 
             {/* GRÁFICOS */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
               {/* Gráfico de Tendência */}
-              <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+              <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
                     <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                      <TrendingUp className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                      <TrendingUp className={`w-6 h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-gray-800">Evolução do Consumo</h3>
@@ -675,10 +643,10 @@ export default function Dashboard() {
               </div>
 
               {/* Gráfico de Pizza */}
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                    <MapPin className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                    <Building className={`w-6 h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-gray-800">Por Unidade</h3>
@@ -740,11 +708,11 @@ export default function Dashboard() {
             </div>
 
             {/* TOP MEDIDORES - Gráfico de Barras */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+            <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                    <AlertCircle className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                    <AlertCircle className={`w-6 h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-gray-800">Top 10 Maiores Consumidores</h3>
@@ -806,6 +774,63 @@ export default function Dashboard() {
                     <p>Sem dados suficientes</p>
                   </div>
                 )}
+              </div>
+
+              {/* NOVO GRÁFICO - POR ANDAR */}
+              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
+                    <Layers className={`w-6 h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">Consumo por Andar</h3>
+                    <p className="text-xs text-gray-400">{dadosPorAndar.length} andares</p>
+                  </div>
+                </div>
+                <div className="h-96 w-full">
+                  {dadosPorAndar.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={dadosPorAndar}
+                        layout="vertical"
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F3F4F6" />
+                        <XAxis type="number" hide />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          width={80}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#374151', fontSize: 11, fontWeight: 600 }}
+                        />
+                        <Tooltip
+                          cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                          content={<CustomTooltip tipo={tipoAtivo} />}
+                        />
+                        <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
+                          {dadosPorAndar.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={pieColors[index % pieColors.length]}
+                            />
+                          ))}
+                          <LabelList 
+                            dataKey="value" 
+                            position="right" 
+                            formatter={(v) => v.toLocaleString('pt-BR')}
+                            style={{ fill: '#374151', fontSize: '11px', fontWeight: 'bold' }}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-gray-400">
+                      <p>Sem dados</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Tabela complementar */}
