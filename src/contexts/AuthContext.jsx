@@ -417,7 +417,11 @@ export function AuthProvider({ children }) {
         email: email.trim().toLowerCase(),
         password: senha,
         options: {
-          data: { name: nome.trim() }
+          data: { name: nome.trim() },
+          // Desabilita a necessidade de confirmação de e-mail.
+          // O usuário poderá fazer login imediatamente após criar a conta,
+          // mas ainda dependerá da liberação de acesso pelo administrador.
+          email_confirm: false
         }
       })
 
