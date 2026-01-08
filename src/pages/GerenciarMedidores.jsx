@@ -896,7 +896,8 @@ export default function GerenciarMedidores() {
                     </th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Medidor</th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Localização</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Unidade</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Andar</th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Token</th>
                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Ações</th>
                   </tr>
@@ -937,22 +938,22 @@ export default function GerenciarMedidores() {
                             </select>
                           </td>
                           <td className="p-4">
-                            <div className="space-y-2">
-                              <input
-                                type="text"
-                                value={editForm.local_unidade}
-                                onChange={(e) => setEditForm({ ...editForm, local_unidade: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                placeholder="Prédio/Local"
-                              />
-                              <input
-                                type="text"
-                                value={editForm.andar}
-                                onChange={(e) => setEditForm({ ...editForm, andar: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                placeholder="Andar"
-                              />
-                            </div>
+                            <input
+                              type="text"
+                              value={editForm.local_unidade}
+                              onChange={(e) => setEditForm({ ...editForm, local_unidade: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                              placeholder="Prédio/Local"
+                            />
+                          </td>
+                          <td className="p-4">
+                            <input
+                              type="text"
+                              value={editForm.andar}
+                              onChange={(e) => setEditForm({ ...editForm, andar: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                              placeholder="Andar"
+                            />
                           </td>
                           <td className="p-4">
                             <div className="flex gap-2">
@@ -1009,24 +1010,11 @@ export default function GerenciarMedidores() {
                               </span>
                             </div>
                           </td>
-                          <td className="p-4">
-                            <div className="text-sm text-gray-700">
-                              {medidor.local_unidade && (
-                                <div className="flex items-center gap-1">
-                                  <Building className="w-4 h-4 text-gray-400" />
-                                  {medidor.local_unidade}
-                                </div>
-                              )}
-                              {medidor.andar && (
-                                <div className="flex items-center gap-1 text-gray-500">
-                                  <Layers className="w-4 h-4 text-gray-400" />
-                                  {medidor.andar}
-                                </div>
-                              )}
-                              {!medidor.local_unidade && !medidor.andar && (
-                                <span className="text-gray-400">Não informado</span>
-                              )}
-                            </div>
+                          <td className="p-4 text-sm text-gray-700">
+                            {medidor.local_unidade || '-'}
+                          </td>
+                          <td className="p-4 text-sm text-gray-500">
+                            {medidor.andar || '-'}
                           </td>
                           <td className="p-4">
                             <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-600">
