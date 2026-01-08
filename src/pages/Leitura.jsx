@@ -90,8 +90,16 @@ export default function Leitura() {
       }
 
       if (medidor.tipo !== tipoAtivo) {
-        setTipoAtivo(medidor.tipo)
-        await new Promise(r => setTimeout(r, 200)) 
+        // Boa Prática: Em vez de um timeout, garantimos que os dados necessários
+        // estejam disponíveis para a UI renderizar corretamente e, em seguida, disparamos a busca completa.
+        // 1. Adiciona temporariamente o medidor escaneado à lista atual. Isso evita que a
+        //    UI "pisque" ou não encontre o nome do medidor selecionado.
+        setTodosMedidores(prev => 
+          prev.some(m => m.id === medidor.id) ? prev : [...prev, medidor]
+        );
+        // 2. Dispara a mudança de tipo, que fará com que o useEffect busque a lista
+        //    completa e correta de medidores para o novo tipo.
+        setTipoAtivo(medidor.tipo);
       }
 
       setPredioSelecionado(medidor.local_unidade)
@@ -180,7 +188,10 @@ export default function Leitura() {
       }
     }
     fetchDadosMedidor()
-  }, [medidorSelecionado, todosMedidores, tipoAtivo])
+    // Otimização: A dependência `todosMedidores` não é estritamente necessária aqui.
+    // O efeito só precisa ser executado novamente quando o ID do medidor selecionado ou o tipo do medidor mudar.
+    // A lógica interna já lida com casos em que os detalhes do medidor não estão na lista local.
+  }, [medidorSelecionado, tipoAtivo])
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0]
