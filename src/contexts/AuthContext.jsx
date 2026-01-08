@@ -8,81 +8,45 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // BOAS PRÁTICAS SUPABASE - onAuthStateChange já dispara INITIAL_SESSION na inicialização
-    // Não precisa de getSession() separado - isso causa race conditions
-    // Ref: https://supabase.com/docs/reference/javascript/auth-onauthstatechange
-    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('[Auth] Evento:', event)
-        
-        if (session?.user) {
-          // Busca dados do profile
-          // Usando Promise com timeout para evitar travamento em mobile
-          const buscarProfile = async () => {
-            try {
-              const { data: profileData, error } = await supabase
-                .from('profiles')
-                .select('name, role, email, photo, export, view, access_medicoes, access_dp_rh')
-                .eq('id', session.user.id)
-                .single()
+        setLoading(true);
+        if (event === 'SIGNED_IN' && session?.user) {
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('name, role, email, photo, export, view, access_medicoes, access_dp_rh')
+            .eq('id', session.user.id)
+            .single();
 
-              if (error && error.code !== 'PGRST116') {
-                console.warn('[Auth] Erro ao buscar profile:', error.message)
-              }
-              
-              setUser({
-                id: session.user.id,
-                email: profileData?.email || session.user.email,
-                nome: profileData?.name || session.user.email,
-                role: profileData?.role || 'user',
-                // Adicionando novos campos do profile
-                photo: profileData?.photo,
-                export: profileData?.export,
-                view: profileData?.view,
-                // Mantendo a lógica de fallback para os campos de acesso
-                access_medicoes: profileData?.access_medicoes ?? true,
-                access_dp_rh: profileData?.access_dp_rh ?? false,
-                tipo: 'email_senha'
-              })
-            } catch (err) {
-              console.error('[Auth] Erro ao processar profile:', err)
-              // Mesmo com erro, seta o user básico
-              setUser({
-                id: session.user.id,
-                email: session.user.email,
-                nome: session.user.email,
-                role: 'user',
-                photo: null,
-                export: null,
-                view: null,
-                access_medicoes: true,
-                access_dp_rh: false,
-                tipo: 'email_senha'
-              })
-            } finally {
-              setLoading(false)
-            }
+          if (error && error.code !== 'PGRST116') {
+            console.warn('[Auth] Erro ao buscar profile:', error.message);
           }
-          
-          // Executa a busca do profile com um pequeno delay para evitar deadlock
-          // Usa requestAnimationFrame quando disponível (melhor para mobile)
-          if (typeof requestAnimationFrame !== 'undefined') {
-            requestAnimationFrame(() => {
-              buscarProfile()
-            })
-          } else {
-            // Fallback para setTimeout
-            setTimeout(buscarProfile, 10)
-          }
+
+          setUser({
+            id: session.user.id,
+            email: profileData?.email || session.user.email,
+            nome: profileData?.name || session.user.email,
+            role: profileData?.role || 'user',
+            photo: profileData?.photo,
+            export: profileData?.export,
+            view: profileData?.view,
+            access_medicoes: profileData?.access_medicoes ?? true,
+            access_dp_rh: profileData?.access_dp_rh ?? false,
+            tipo: 'email_senha'
+          });
+          setLoading(false);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setLoading(false);
         } else {
-          // Sem sessão Supabase - verifica token QR Code
-          const tokenSalvo = sessionStorage.getItem('gowork_token_n1')
+          // Trata o carregamento inicial (INITIAL_SESSION) ou token de QR Code
+          const tokenSalvo = sessionStorage.getItem('gowork_token_n1');
           if (tokenSalvo) {
-            await validarTokenN1(tokenSalvo)
+            await validarTokenN1(tokenSalvo);
           } else {
-            setUser(null)
-            setLoading(false)
+            // Se não há sessão Supabase nem token, finaliza o loading
+            setUser(null);
+            setLoading(false);
           }
         }
       }

@@ -53,6 +53,7 @@ export default function Login() {
       setSucesso(res.message || 'Conta criada! Aguarde liberação de acesso pelo administrador.')
       setLoading(false)
       // Limpa o formulário
+      setEmail('')
       setNome('')
       setSenha('')
       setConfirmarSenha('')
