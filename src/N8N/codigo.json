@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Pega os dados que vieram do Webhook (do passo anterior)\n// IMPORTANTE: Ajuste 'body' se o seu JSON vier com outro nome ou direto na raiz\nconst dados = items[0].json.body || items[0].json;\n\n// Monta a mensagem formatada para o WhatsApp\n// Usamos *asteriscos* para negrito\nconst mensagem = `📊 *Nova Leitura Recebida!*\n\n🏢 *Medidor:* ${dados.nome_medidor || 'Não informado'}\n💧/⚡ *Tipo:* ${dados.tipo || 'Geral'}\n🔢 *Leitura:* ${dados.leitura}\n👤 *Enviado por:* ${dados.usuario || 'Sistema'}\n\n📅 *Data:* ${new Date().toLocaleString('pt-BR')}\n\n_Mensagem automática do Sistema de Medição_`;\n\n// Retorna apenas a mensagem pronta para o próximo passo\nreturn [\n  {\n    json: {\n      mensagem_pronta: mensagem,\n      numero_destino: \"5511999999999\" // Coloque o número do admin aqui ou venha do backend\n    }\n  }\n];"
+        "jsCode": "// Pega os dados que vieram do Webhook\n// O n8n coloca o corpo da requisição dentro da propriedade 'body'\nconst dados = items[0].json.body;\n\n// Formata os números para o padrão brasileiro\nconst format = (num) => num ? Number(num).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : 'N/A';\n\n// Monta a mensagem formatada para o WhatsApp\n// Usamos *asteriscos* para negrito e _underscore_ para itálico\nconst mensagem = `🚨 *ALERTA DE CONSUMO ELEVADO* 🚨\n\n*Unidade:* ${dados.local_unidade || 'N/A'}\n*Andar:* ${dados.andar || 'N/A'}\n*Medidor:* ${dados.nome_medidor || 'Não informado'}\n\n*Leitura Atual:* ${format(dados.leitura_atual)}\n*Consumo Registrado:* ${format(dados.consumo)}\n*Média Histórica:* ${format(dados.media_historica)}\n\n📈 *Consumo ${dados.porcentagem_acima_media}% acima da média!*\n\n*Justificativa:*\n_${dados.justificativa || 'Nenhuma justificativa fornecida.'}_\n\n*Registrado por:* ${dados.usuario || 'Sistema'}\n*Evidência:* ${dados.foto_url || 'Sem foto'}`;\n\n// Retorna a mensagem pronta e o número de destino\nreturn [\n  {\n    json: {\n      mensagem_pronta: mensagem,\n      numero_destino: \"5511916732004\"\n    }\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -52,11 +52,11 @@
           "parameters": [
             {
               "name": "number",
-              "value": "=5511916732004"
+              "value": "={{ $('Code in JavaScript').item.json.numero_destino }}"
             },
             {
               "name": "text",
-              "value": "="
+              "value": "={{ $('Code in JavaScript').item.json.mensagem_pronta }}"
             }
           ]
         },

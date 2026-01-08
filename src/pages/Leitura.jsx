@@ -12,7 +12,7 @@ import {
 import CustomSelect from '../components/CustomSelect'
 
 // --- CONFIGURAÇÕES DO SISTEMA ---
-const N8N_WEBHOOK_URL = '' 
+const N8N_WEBHOOK_URL = 'https://flux.gowork.com.br/webhook/nova-leitura' 
 const PORCENTAGEM_ALERTA = 0.60 
 const VALOR_SEM_ANDAR = '___SEM_ANDAR___'
 
@@ -224,9 +224,10 @@ export default function Leitura() {
       fotoUrl = urlData.publicUrl;
 
       let obsFinal = ''
+      let porcentagemAcimaMedia = null
       if (isConsumoAlto) {
-        const porcentagem = Math.round(((consumo / mediaHistorica) - 1) * 100)
-        obsFinal = `ALERTA: Consumo +${porcentagem}% acima da média.`
+        porcentagemAcimaMedia = Math.round(((consumo / mediaHistorica) - 1) * 100)
+        obsFinal = `ALERTA: Consumo +${porcentagemAcimaMedia}% acima da média.`
       }
       if (isMenorQueAnterior) {
         obsFinal = motivoValidacao === 'virada' ? 'Virada de Relógio' : 'Ajuste Manual'
@@ -246,19 +247,31 @@ export default function Leitura() {
 
       refreshData() // Força a atualização de outros componentes, como o Dashboard
       
-      if (N8N_WEBHOOK_URL) {
-        await fetch(N8N_WEBHOOK_URL, {
+      // --- LÓGICA DO WEBHOOK PARA N8N ---
+      // Dispara o webhook apenas se o consumo for alto
+      if (N8N_WEBHOOK_URL && isConsumoAlto) {
+        const medidor = todosMedidores.find(m => m.id === medidorSelecionado)
+
+        const webhookPayload = {
+          nome_medidor: medidor?.nome || 'Não encontrado',
+          local_unidade: medidor?.local_unidade || 'Não informada',
+          andar: medidor?.andar || 'Não informado',
+          tipo: tipoAtivo,
+          leitura_atual: valorAtualNum,
+          leitura_anterior: valorAnteriorNum,
+          consumo: consumo,
+          media_historica: mediaHistorica,
+          porcentagem_acima_media: porcentagemAcimaMedia,
+          justificativa: justificativa,
+          usuario: user?.nome || user?.email,
+          foto_url: fotoUrl,
+        }
+
+        fetch(N8N_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...dadosLeitura,
-            usuario: user?.nome || user?.email,
-            leitura_atual: valorAtualNum,
-            leitura_anterior: valorAnteriorNum,
-            consumo: consumo,
-            alerta: isConsumoAlto || isMenorQueAnterior
-          })
-        }).catch(err => console.error(err))
+          body: JSON.stringify(webhookPayload)
+        }).catch(err => console.error("Erro ao enviar Webhook para n8n:", err))
       }
 
       setMensagem(isConsumoAlto ? 'Salvo com justificativa!' : 'Leitura salva com sucesso!')
