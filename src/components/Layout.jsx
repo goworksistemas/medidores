@@ -16,32 +16,81 @@ export default function Layout() {
     const checkVersion = async () => {
       try {
         // Adiciona um parâmetro para evitar o cache do navegador
-        const response = await fetch(`/version.json?v=${new Date().getTime()}`);
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/version.json?v=${timestamp}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        });
+        
         if (!response.ok) {
           // Não bloqueia o usuário se a verificação falhar (ex: offline)
-          console.warn(`Falha ao buscar version.json: ${response.statusText}`);
+          console.warn(`[Version] Falha ao buscar version.json: ${response.statusText}`);
           return;
         }
+        
         const serverConfig = await response.json();
         const serverVersion = serverConfig.version;
+        const forceUpdate = serverConfig.forceUpdate === true;
         const localVersion = localStorage.getItem('app_version');
 
-        if (localVersion && localVersion !== serverVersion) {
-          console.log(`Nova versão detectada. Servidor: ${serverVersion}, Local: ${localVersion}. Limpando dados e recarregando.`);
+        // Se não há versão local, salva a versão atual
+        if (!localVersion) {
+          localStorage.setItem('app_version', serverVersion);
+          if (serverConfig.build) {
+            localStorage.setItem('app_build', serverConfig.build);
+          }
+          return;
+        }
+
+        // Verifica se há nova versão ou se é forçado a atualizar
+        if (localVersion !== serverVersion || forceUpdate) {
+          console.log(`[Version] Nova versão detectada!`);
+          console.log(`[Version] Servidor: ${serverVersion} (build: ${serverConfig.build || 'N/A'})`);
+          console.log(`[Version] Local: ${localVersion}`);
+          console.log(`[Version] Forçar atualização: ${forceUpdate}`);
+          console.log(`[Version] Limpando todos os dados e recarregando...`);
+
+          // Limpa todos os dados de armazenamento
           localStorage.clear();
           sessionStorage.clear();
+          
+          // Limpa cookies
+          document.cookie.split(";").forEach((c) => {
+            const eqPos = c.indexOf("=");
+            const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
+            // Limpa cookies do domínio atual e do domínio pai
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.${window.location.hostname}`;
+          });
+
+          // Salva a nova versão antes de recarregar
           localStorage.setItem('app_version', serverVersion);
-          window.location.reload(true);
-        } else if (!localVersion) {
-          localStorage.setItem('app_version', serverVersion);
+          if (serverConfig.build) {
+            localStorage.setItem('app_build', serverConfig.build);
+          }
+
+          // Mostra mensagem se disponível
+          if (serverConfig.message) {
+            console.log(`[Version] ${serverConfig.message}`);
+          }
+
+          // Força recarregamento completo (sem cache)
+          window.location.href = window.location.origin + window.location.pathname + '?v=' + timestamp;
         }
       } catch (error) {
-        console.error('Falha ao verificar a versão da aplicação:', error);
+        console.error('[Version] Falha ao verificar a versão da aplicação:', error);
+        // Não bloqueia o usuário em caso de erro
       }
     };
 
-    // Verifica a versão na carga inicial
-    checkVersion();
+    // Verifica a versão na carga inicial (com pequeno delay para não interferir no carregamento)
+    const initialTimer = setTimeout(() => {
+      checkVersion();
+    }, 1000);
 
     // Verifica novamente quando o usuário volta para a aba do navegador
     const handleVisibilityChange = () => {
@@ -52,8 +101,11 @@ export default function Layout() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Limpa o listener quando o componente é desmontado
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    // Limpa os timers e listeners quando o componente é desmontado
+    return () => {
+      clearTimeout(initialTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const handleLogout = () => {
