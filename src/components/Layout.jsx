@@ -39,7 +39,7 @@ export default function Layout() {
       
       {/* HEADER SUPERIOR (Igual para Mobile e Desktop) */}
       <header className={`shadow-lg sticky top-0 z-40 transition-all relative ${
-        tipoAtivo === 'agua'
+        tipoAtivo === 'agua' 
           ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white'
           : 'bg-gradient-to-r from-yellow-300 to-yellow-400 text-yellow-900'
       }`}>
