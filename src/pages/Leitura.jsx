@@ -59,11 +59,6 @@ export default function Leitura() {
   // 2. Carrega todos os medidores
   useEffect(() => {
     async function fetchMedidores() {
-      if (!medidorSelecionado) {
-        setPredioSelecionado('')
-        setAndarSelecionado('')
-      }
-      
       const { data } = await supabase
         .from('med_medidores')
         .select('*')
@@ -103,11 +98,13 @@ export default function Leitura() {
       setAndarSelecionado(medidor.andar || VALOR_SEM_ANDAR)
       setMedidorSelecionado(medidor.id)
       
-      setMensagem(`Identificado: ${medidor.nome}`)
+      setMensagem({ tipo: 'sucesso', texto: `Identificado: ${medidor.nome}` })
       setTimeout(() => setMensagem(null), 3000)
 
+      // Limpa a URL para evitar que o scanner reabra ao recarregar a página
+      navigate('/leitura', { replace: true });
     } catch (err) {
-      alert(err.message)
+      setMensagem({ tipo: 'erro', texto: err.message });
     } finally {
       setLoading(false)
     }
@@ -274,7 +271,7 @@ export default function Leitura() {
         }).catch(err => console.error("Erro ao enviar Webhook para n8n:", err))
       }
 
-      setMensagem(isConsumoAlto ? 'Salvo com justificativa!' : 'Leitura salva com sucesso!')
+      setMensagem({ tipo: 'sucesso', texto: isConsumoAlto ? 'Salvo com justificativa!' : 'Leitura salva com sucesso!' })
       
       // Limpeza
       setLeituraAtual('')
@@ -294,7 +291,8 @@ export default function Leitura() {
       if (error.message.includes('storage.objects.create')) {
         friendlyMessage = 'Erro ao salvar a foto. Verifique se o bucket "evidencias" existe e se as permissões estão corretas.'
       }
-      setMensagem({ tipo: 'erro', texto: friendlyMessage })
+      // Usa o novo sistema de mensagens em vez do alert()
+      setMensagem({ tipo: 'erro', texto: friendlyMessage });
       setTimeout(() => setMensagem(null), 5000)
     } finally {
       setLoading(false)
@@ -337,7 +335,12 @@ export default function Leitura() {
 
               <div className="inline-flex bg-white rounded-2xl p-1.5 shadow-lg border border-gray-200">
                 <button
-                  onClick={() => setTipoAtivo('agua')}
+                  onClick={() => {
+                    setTipoAtivo('agua');
+                    setPredioSelecionado('');
+                    setAndarSelecionado('');
+                    setMedidorSelecionado('');
+                  }}
                   className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
                     tipoAtivo === 'agua'
                       ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg'
@@ -348,7 +351,12 @@ export default function Leitura() {
                   <span className="hidden sm:inline">Água</span>
                 </button>
                 <button
-                  onClick={() => setTipoAtivo('energia')}
+                  onClick={() => {
+                    setTipoAtivo('energia');
+                    setPredioSelecionado('');
+                    setAndarSelecionado('');
+                    setMedidorSelecionado('');
+                  }}
                   className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
                     tipoAtivo === 'energia'
                       ? 'bg-gradient-to-r from-yellow-300 to-yellow-300 text-white shadow-lg'
@@ -441,14 +449,18 @@ export default function Leitura() {
         {/* MENSAGEM */}
         {mensagem && (
           <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top ${
-            mensagem.includes('Identificado') 
-              ? 'bg-blue-50 border border-blue-200 text-blue-900'
-              : mensagem.includes('Justificativa') || mensagem.includes('Alerta')
-              ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
-              : 'bg-green-50 border border-green-200 text-emerald-900'
+            mensagem.tipo === 'erro'
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : mensagem.tipo === 'aviso'
+              ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+              : 'bg-green-50 border-green-200 text-emerald-900' // sucesso ou info
           }`}>
-            <CheckCircle className="w-6 h-6 flex-shrink-0" />
-            <span className="font-semibold">{mensagem}</span>
+            {mensagem.tipo === 'erro' ? (
+              <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+            ) : (
+              <CheckCircle className="w-6 h-6 flex-shrink-0" />
+            )}
+            <span className="font-semibold">{mensagem.texto}</span>
           </div>
         )}
 
