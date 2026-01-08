@@ -45,16 +45,61 @@ export default function Leitura() {
   // Controle do Scanner
   const [mostrarScanner, setMostrarScanner] = useState(false)
   const [cameraError, setCameraError] = useState(null)
+  const [scannerKey, setScannerKey] = useState(0) // Para forçar remontagem do scanner
   
   const fileInputRef = useRef(null)
 
   // 1. Efeito para abrir o scanner via URL
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(window.location.search)
     if (params.get('scan') === 'true') {
-      setMostrarScanner(true);
+      setMostrarScanner(true)
     }
-  }, []);
+  }, [])
+
+  // Função para lidar com erros do scanner
+  const handleScannerError = (error) => {
+    console.error('[Leitura] Erro no scanner:', error)
+    let mensagemErro = 'Erro ao acessar a câmera.'
+    
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      mensagemErro = 'Permissão de câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.'
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      mensagemErro = 'Nenhuma câmera encontrada. Verifique se há uma câmera conectada.'
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      mensagemErro = 'Câmera já está em uso por outro aplicativo.'
+    } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+      mensagemErro = 'Câmera não suporta os requisitos necessários.'
+    }
+    
+    setCameraError(mensagemErro)
+    setMostrarScanner(false)
+  }
+
+  // Função para abrir o scanner com tratamento de erros
+  const abrirScanner = async () => {
+    try {
+      // Verifica se há suporte para getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError('Seu navegador não suporta acesso à câmera. Use um navegador mais recente.')
+        return
+      }
+
+      // Tenta acessar a câmera para verificar permissões
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+        // Se conseguir, para o stream e abre o scanner
+        stream.getTracks().forEach(track => track.stop())
+        setCameraError(null)
+        setScannerKey(prev => prev + 1) // Força remontagem do scanner
+        setMostrarScanner(true)
+      } catch (err) {
+        handleScannerError(err)
+      }
+    } catch (err) {
+      handleScannerError(err)
+    }
+  }
 
   // 2. Carrega todos os medidores
   useEffect(() => {
@@ -70,49 +115,98 @@ export default function Leitura() {
     fetchMedidores()
   }, [tipoAtivo])
 
+  // Função auxiliar para validar formato de token
+  function validarFormatoToken(token) {
+    if (!token || typeof token !== 'string') return false
+    const tokenLimpo = token.trim()
+    // Aceita UUIDs ou strings alfanuméricas com pelo menos 4 caracteres
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const tokenRegex = /^[a-zA-Z0-9_-]{4,}$/
+    return uuidRegex.test(tokenLimpo) || tokenRegex.test(tokenLimpo)
+  }
+
   // 3. Lógica do Scanner
   const handleMedidorScan = async (result) => {
-    if (!result || result.length === 0) return
+    if (!result || !Array.isArray(result) || result.length === 0) {
+      return
+    }
+
+    let tokenLido = null
     
-    const tokenLido = result[0].rawValue 
+    // Tenta extrair o token de diferentes formatos possíveis
+    try {
+      if (result[0].rawValue) {
+        tokenLido = result[0].rawValue
+      } else if (result[0].text) {
+        tokenLido = result[0].text
+      } else if (typeof result[0] === 'string') {
+        tokenLido = result[0]
+      } else {
+        throw new Error('Formato de QR Code não reconhecido.')
+      }
+    } catch (err) {
+      setMensagem({ tipo: 'erro', texto: 'Erro ao ler QR Code. Tente novamente.' })
+      return
+    }
+
+    // Valida formato do token
+    if (!validarFormatoToken(tokenLido)) {
+      setMensagem({ tipo: 'erro', texto: 'QR Code inválido. Verifique se está escaneando o código correto.' })
+      return
+    }
+
     setMostrarScanner(false)
     setLoading(true)
+    setMensagem(null)
 
     try {
+      const tokenLimpo = tokenLido.trim()
+      
       const { data: medidor, error } = await supabase
         .from('med_medidores')
         .select('*')
-        .eq('token', tokenLido) 
+        .eq('token', tokenLimpo) 
         .single()
 
-      if (error || !medidor) {
-        throw new Error('QR Code não cadastrado ou medidor não encontrado.')
+      if (error) {
+        if (error.code === 'PGRST116') {
+          throw new Error('QR Code não cadastrado no sistema.')
+        }
+        console.error('[Leitura] Erro ao buscar medidor:', error)
+        throw new Error('Erro ao buscar medidor. Tente novamente.')
+      }
+
+      if (!medidor) {
+        throw new Error('Medidor não encontrado.')
+      }
+
+      // Verifica se o medidor está ativo (se houver campo ativo)
+      if (medidor.ativo === false) {
+        throw new Error('Este medidor está inativo.')
       }
 
       if (medidor.tipo !== tipoAtivo) {
-        // Boa Prática: Em vez de um timeout, garantimos que os dados necessários
-        // estejam disponíveis para a UI renderizar corretamente e, em seguida, disparamos a busca completa.
-        // 1. Adiciona temporariamente o medidor escaneado à lista atual. Isso evita que a
-        //    UI "pisque" ou não encontre o nome do medidor selecionado.
+        // Adiciona temporariamente o medidor escaneado à lista atual
         setTodosMedidores(prev => 
           prev.some(m => m.id === medidor.id) ? prev : [...prev, medidor]
-        );
-        // 2. Dispara a mudança de tipo, que fará com que o useEffect busque a lista
-        //    completa e correta de medidores para o novo tipo.
-        setTipoAtivo(medidor.tipo);
+        )
+        // Dispara a mudança de tipo
+        setTipoAtivo(medidor.tipo)
       }
 
-      setPredioSelecionado(medidor.local_unidade)
+      setPredioSelecionado(medidor.local_unidade || '')
       setAndarSelecionado(medidor.andar || VALOR_SEM_ANDAR)
       setMedidorSelecionado(medidor.id)
       
-      setMensagem({ tipo: 'sucesso', texto: `Identificado: ${medidor.nome}` })
+      setMensagem({ tipo: 'sucesso', texto: `Medidor identificado: ${medidor.nome || 'Sem nome'}` })
       setTimeout(() => setMensagem(null), 3000)
 
       // Limpa a URL para evitar que o scanner reabra ao recarregar a página
-      navigate('/leitura', { replace: true });
+      navigate('/leitura', { replace: true })
     } catch (err) {
-      setMensagem({ tipo: 'erro', texto: err.message });
+      console.error('[Leitura] Erro no scan:', err)
+      setMensagem({ tipo: 'erro', texto: err.message || 'Erro ao processar QR Code.' })
+      setTimeout(() => setMensagem(null), 5000)
     } finally {
       setLoading(false)
     }
@@ -195,10 +289,31 @@ export default function Leitura() {
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0]
-    if (file) {
-      setFoto(file)
-      setPreviewUrl(URL.createObjectURL(file))
+    if (!file) return
+
+    // Validações do arquivo
+    if (!file.type.startsWith('image/')) {
+      setMensagem({ tipo: 'erro', texto: 'Por favor, selecione um arquivo de imagem válido.' })
+      setTimeout(() => setMensagem(null), 3000)
+      return
     }
+
+    // Limita o tamanho da foto (10MB)
+    const maxSize = 10 * 1024 * 1024 // 10MB em bytes
+    if (file.size > maxSize) {
+      setMensagem({ tipo: 'erro', texto: 'A foto é muito grande. O tamanho máximo é 10MB.' })
+      setTimeout(() => setMensagem(null), 3000)
+      return
+    }
+
+    // Limpa a preview anterior se existir
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+    }
+
+    setFoto(file)
+    setPreviewUrl(URL.createObjectURL(file))
+    setMensagem(null)
   }
 
   // --- VALIDAÇÕES E CÁLCULOS ---
@@ -217,19 +332,61 @@ export default function Leitura() {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!podeEnviar) return
-    setLoading(true)
     
-    let fotoUrl = null; // Garante que a variável exista
+    // Validações adicionais antes de enviar
+    if (!medidorSelecionado) {
+      setMensagem({ tipo: 'erro', texto: 'Selecione um medidor antes de salvar.' })
+      return
+    }
+
+    if (!foto) {
+      setMensagem({ tipo: 'erro', texto: 'É necessário tirar uma foto do medidor.' })
+      return
+    }
+
+    setLoading(true)
+    setMensagem(null)
+    
+    let fotoUrl = null
     try {
-      const fileExt = foto.name.split('.').pop()
-      const fileName = `${Date.now()}_${Math.random()}.${fileExt}`
+      // Valida o arquivo de foto
+      if (!foto.type.startsWith('image/')) {
+        throw new Error('O arquivo selecionado não é uma imagem válida.')
+      }
+
+      // Limita o tamanho da foto (10MB)
+      const maxSize = 10 * 1024 * 1024 // 10MB em bytes
+      if (foto.size > maxSize) {
+        throw new Error('A foto é muito grande. O tamanho máximo é 10MB.')
+      }
+
+      const fileExt = foto.name.split('.').pop() || 'jpg'
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+      
       // Upload para o bucket 'evidencias'
-      const { error: uploadError } = await supabase.storage.from('evidencias').upload(fileName, foto)
-      if (uploadError) throw uploadError
+      const { error: uploadError } = await supabase.storage.from('evidencias').upload(fileName, foto, {
+        cacheControl: '3600',
+        upsert: false
+      })
+      
+      if (uploadError) {
+        console.error('[Leitura] Erro no upload:', uploadError)
+        if (uploadError.message.includes('already exists')) {
+          throw new Error('Erro: arquivo já existe. Tente novamente.')
+        } else if (uploadError.message.includes('Bucket not found')) {
+          throw new Error('Erro: bucket de armazenamento não encontrado. Contate o administrador.')
+        } else if (uploadError.message.includes('new row violates row-level security')) {
+          throw new Error('Erro: sem permissão para fazer upload. Contate o administrador.')
+        }
+        throw uploadError
+      }
       
       // Obtenção da URL pública do bucket 'evidencias'
       const { data: urlData } = supabase.storage.from('evidencias').getPublicUrl(fileName)
-      fotoUrl = urlData.publicUrl;
+      if (!urlData || !urlData.publicUrl) {
+        throw new Error('Erro ao obter URL da foto após upload.')
+      }
+      fotoUrl = urlData.publicUrl
 
       let obsFinal = ''
       let porcentagemAcimaMedia = null
@@ -297,13 +454,27 @@ export default function Leitura() {
       setTimeout(() => setMensagem(null), 3000)
 
     } catch (error) {
-      console.error('Erro ao salvar leitura:', error)
-      let friendlyMessage = 'Erro ao salvar: ' + error.message
-      if (error.message.includes('storage.objects.create')) {
-        friendlyMessage = 'Erro ao salvar a foto. Verifique se o bucket "evidencias" existe e se as permissões estão corretas.'
+      console.error('[Leitura] Erro ao salvar leitura:', error)
+      let friendlyMessage = 'Erro ao salvar leitura.'
+      
+      if (error.message) {
+        friendlyMessage = error.message
+      } else if (typeof error === 'string') {
+        friendlyMessage = error
+      } else if (error.error_description) {
+        friendlyMessage = error.error_description
       }
-      // Usa o novo sistema de mensagens em vez do alert()
-      setMensagem({ tipo: 'erro', texto: friendlyMessage });
+
+      // Mensagens específicas para diferentes tipos de erro
+      if (friendlyMessage.includes('storage') || friendlyMessage.includes('bucket')) {
+        friendlyMessage = 'Erro ao salvar a foto. Verifique se o bucket "evidencias" existe e se as permissões estão corretas.'
+      } else if (friendlyMessage.includes('network') || friendlyMessage.includes('fetch')) {
+        friendlyMessage = 'Erro de conexão. Verifique sua internet e tente novamente.'
+      } else if (friendlyMessage.includes('permission') || friendlyMessage.includes('row-level security')) {
+        friendlyMessage = 'Sem permissão para realizar esta ação. Contate o administrador.'
+      }
+
+      setMensagem({ tipo: 'erro', texto: friendlyMessage })
       setTimeout(() => setMensagem(null), 5000)
     } finally {
       setLoading(false)
@@ -327,7 +498,7 @@ export default function Leitura() {
               </div>
               
               <button 
-                onClick={() => setMostrarScanner(true)}
+                onClick={abrirScanner}
                 className="md:hidden p-3 bg-gray-900 text-white rounded-xl shadow-lg active:scale-95 flex flex-col items-center gap-1"
               >
                 <QrCode className="w-6 h-6" />
@@ -337,7 +508,7 @@ export default function Leitura() {
             
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-end">
                <button 
-                onClick={() => setMostrarScanner(true)}
+                onClick={abrirScanner}
                 className="hidden md:flex items-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-900 shadow-lg transition-transform hover:scale-105 mr-2"
               >
                 <QrCode className="w-5 h-5" />
@@ -419,20 +590,28 @@ export default function Leitura() {
           <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-sm relative">
               <h3 className="text-white text-center text-lg font-bold mb-4">
-                Aponte para o QR Code
+                Aponte para o QR Code do Relógio
               </h3>
               
               <div className="rounded-2xl overflow-hidden border-2 border-cyan-400">
                 <Scanner 
+                  key={scannerKey}
                   onScan={handleMedidorScan}
+                  onError={handleScannerError}
                   scanDelay={500}
                   allowMultiple={false}
+                  constraints={{
+                    facingMode: 'environment' // Prefere câmera traseira
+                  }}
                 />
               </div>
               
               <button 
-                onClick={() => setMostrarScanner(false)} 
-                className="mt-6 w-full py-3 bg-white/20 border border-white/30 text-white rounded-xl font-bold"
+                onClick={() => {
+                  setMostrarScanner(false)
+                  setCameraError(null)
+                }} 
+                className="mt-6 w-full py-3 bg-white/20 border border-white/30 text-white rounded-xl font-bold hover:bg-white/30 transition-colors"
               >
                 Cancelar
               </button>

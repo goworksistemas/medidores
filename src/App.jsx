@@ -17,8 +17,10 @@ import AguardandoAprovacao from './pages/AguardandoAprovacao'
 function RotaPrivada({ children }) {
   const { user, loading } = useAuth()
   const [timeoutReached, setTimeoutReached] = useState(false)
+  const [forceRedirect, setForceRedirect] = useState(false)
   
   useEffect(() => {
+    // Timeout de aviso após 3 segundos
     const timer = setTimeout(() => {
       if (loading) {
         setTimeoutReached(true)
@@ -28,27 +30,36 @@ function RotaPrivada({ children }) {
   }, [loading])
   
   useEffect(() => {
+    // Timeout absoluto após 10 segundos - força redirecionamento
     const forceTimeout = setTimeout(() => {
       if (loading) {
-        console.error('Timeout absoluto: redirecionando para login')
-        window.location.href = '/login'
+        console.warn('[App] Timeout de autenticação: redirecionando para login')
+        setForceRedirect(true)
       }
-    }, 8000)
+    }, 10000)
     return () => clearTimeout(forceTimeout)
   }, [loading])
+
+  // Se o timeout absoluto foi atingido, redireciona imediatamente
+  if (forceRedirect) {
+    return <Navigate to="/login" replace />
+  }
   
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <p className="text-gray-600 font-medium">Carregando...</p>
+        <p className="text-gray-600 font-medium">Verificando autenticação...</p>
         {timeoutReached && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg max-w-md text-center">
             <p className="text-sm text-yellow-800">
               O carregamento está demorando mais que o esperado. 
               <br />
               <button 
-                onClick={() => window.location.href = '/login'} 
+                onClick={() => {
+                  sessionStorage.clear()
+                  window.location.href = '/login'
+                }} 
                 className="mt-2 text-blue-600 hover:underline font-semibold"
               >
                 Ir para Login
@@ -61,7 +72,7 @@ function RotaPrivada({ children }) {
   }
   
   if (!user) {
-    return <Navigate to="/login" />
+    return <Navigate to="/login" replace />
   }
 
   // Verifica se o usuário tem acesso ao sistema de medições
@@ -71,7 +82,7 @@ function RotaPrivada({ children }) {
   const temAcessoMedicoes = user.access_medicoes === true
   
   if (!isAdmin && !isQrCode && !temAcessoMedicoes) {
-    return <Navigate to="/aguardando-aprovacao" />
+    return <Navigate to="/aguardando-aprovacao" replace />
   }
 
   return children

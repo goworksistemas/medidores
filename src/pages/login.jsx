@@ -10,6 +10,7 @@ export default function Login() {
   const navigate = useNavigate()
   
   const [isScanning, setIsScanning] = useState(false)
+  const [scannerKey, setScannerKey] = useState(0) // Para forçar remontagem do scanner
   const [modoLogin, setModoLogin] = useState('email') // 'email', 'qr' ou 'criar'
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
@@ -94,26 +95,85 @@ export default function Login() {
   }
 
 
+  // Função auxiliar para validar formato de token
+  function validarFormatoToken(token) {
+    if (!token || typeof token !== 'string') return false
+    const tokenLimpo = token.trim()
+    // Aceita UUIDs ou strings alfanuméricas com pelo menos 4 caracteres
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const tokenRegex = /^[a-zA-Z0-9_-]{4,}$/
+    return uuidRegex.test(tokenLimpo) || tokenRegex.test(tokenLimpo)
+  }
+
+  // Função para lidar com erros do scanner
+  const handleScannerError = (error) => {
+    console.error('[Login] Erro no scanner:', error)
+    let mensagemErro = 'Erro ao acessar a câmera.'
+    
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      mensagemErro = 'Permissão de câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.'
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      mensagemErro = 'Nenhuma câmera encontrada. Verifique se há uma câmera conectada.'
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      mensagemErro = 'Câmera já está em uso por outro aplicativo.'
+    } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+      mensagemErro = 'Câmera não suporta os requisitos necessários.'
+    }
+    
+    setErro(mensagemErro)
+    setIsScanning(false)
+    setLoading(false)
+  }
+
   const handleScan = async (result) => {
-    if (result && result.length > 0) {
-      // Pega o valor bruto do QR Code (o UUID)
-      const rawValue = result[0].rawValue 
-      
-      setIsScanning(false) // Fecha camera
-      setLoading(true)
-      
-      const res = await loginViaQrCode(rawValue)
-      
-      if (res.success) {
-        setSucesso('QR Code validado! Redirecionando...')
-        // Timeout de segurança: se não redirecionar em 5s, libera o loading
-        setTimeout(() => {
-          setLoading(false)
-        }, 5000)
+    if (!result || !Array.isArray(result) || result.length === 0) {
+      setErro('QR Code não detectado. Tente novamente.')
+      return
+    }
+
+    let tokenLido = null
+    
+    // Tenta extrair o token de diferentes formatos possíveis
+    try {
+      if (result[0].rawValue) {
+        tokenLido = result[0].rawValue
+      } else if (result[0].text) {
+        tokenLido = result[0].text
+      } else if (typeof result[0] === 'string') {
+        tokenLido = result[0]
       } else {
-        setErro('QR Code não reconhecido no sistema.')
-        setLoading(false)
+        setErro('Formato de QR Code não reconhecido.')
+        return
       }
+    } catch (err) {
+      console.error('[Login] Erro ao extrair token:', err)
+      setErro('Erro ao ler QR Code. Tente novamente.')
+      return
+    }
+
+    // Valida formato do token
+    if (!validarFormatoToken(tokenLido)) {
+      setErro('QR Code inválido. Verifique se está escaneando o código correto.')
+      setIsScanning(false)
+      return
+    }
+    
+    setIsScanning(false) // Fecha camera
+    setLoading(true)
+    setErro('')
+    setSucesso('')
+    
+    const res = await loginViaQrCode(tokenLido)
+    
+    if (res.success) {
+      setSucesso('QR Code validado! Redirecionando...')
+      // Timeout de segurança: se não redirecionar em 5s, libera o loading
+      setTimeout(() => {
+        setLoading(false)
+      }, 5000)
+    } else {
+      setErro(res.message || 'QR Code não reconhecido no sistema.')
+      setLoading(false)
     }
   }
 
@@ -149,14 +209,22 @@ export default function Login() {
                 
                 <div className="rounded-xl overflow-hidden border-2 border-cyan-400">
                   <Scanner 
+                    key={scannerKey}
                     onScan={handleScan}
+                    onError={handleScannerError}
                     scanDelay={500}
                     allowMultiple={false}
+                    constraints={{
+                      facingMode: 'environment' // Prefere câmera traseira
+                    }}
                   />
                 </div>
 
                 <button 
-                  onClick={() => setIsScanning(false)}
+                  onClick={() => {
+                    setIsScanning(false)
+                    setErro('')
+                  }}
                   className="mt-8 mx-auto flex items-center gap-2 px-6 py-3 bg-white/10 text-white rounded-full hover:bg-white/20 transition-all border border-white/20"
                 >
                   <X className="w-5 h-5" /> Cancelar
@@ -394,9 +462,26 @@ export default function Login() {
                   </div>
 
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setErro('')
-                      setIsScanning(true)
+                      setSucesso('')
+                      
+                      // Verifica se há suporte para getUserMedia
+                      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        setErro('Seu navegador não suporta acesso à câmera. Use um navegador mais recente.')
+                        return
+                      }
+
+                      // Tenta acessar a câmera para verificar permissões
+                      try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+                        // Se conseguir, para o stream e abre o scanner
+                        stream.getTracks().forEach(track => track.stop())
+                        setScannerKey(prev => prev + 1) // Força remontagem do scanner
+                        setIsScanning(true)
+                      } catch (err) {
+                        handleScannerError(err)
+                      }
                     }}
                     disabled={loading}
                     className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-blue-500/30 transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
