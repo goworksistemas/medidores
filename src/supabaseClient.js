@@ -1,27 +1,25 @@
 import { createClient } from '@supabase/supabase-js'
+import { logger } from './utils/logger'
 
-// Variáveis de ambiente - configure no arquivo .env
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-// Log para debug (remover em produção)
-console.log('[Supabase] URL configurada:', supabaseUrl ? 'SIM' : 'NÃO')
+logger.debug('Supabase', 'URL configurada:', supabaseUrl ? 'SIM' : 'NÃO')
 if (supabaseUrl) {
-  // Mostra apenas o domínio para segurança
   try {
     const urlObj = new URL(supabaseUrl)
-    console.log('[Supabase] Domínio:', urlObj.hostname)
+    logger.debug('Supabase', 'Domínio:', urlObj.hostname)
   } catch (e) {
-    console.log('[Supabase] URL:', supabaseUrl.substring(0, 30) + '...')
+    logger.debug('Supabase', 'URL:', supabaseUrl.substring(0, 30) + '...')
   }
 }
-console.log('[Supabase] Key configurada:', supabaseAnonKey ? 'SIM' : 'NÃO')
+logger.debug('Supabase', 'Key configurada:', supabaseAnonKey ? 'SIM' : 'NÃO')
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('[Supabase] Variáveis de ambiente não configuradas!')
-  console.error('Crie um arquivo .env na raiz do projeto com:')
-  console.error('VITE_SUPABASE_URL=sua_url')
-  console.error('VITE_SUPABASE_ANON_KEY=sua_key')
+  logger.error('[Supabase] Variáveis de ambiente não configuradas!')
+  logger.error('Crie um arquivo .env na raiz do projeto com:')
+  logger.error('VITE_SUPABASE_URL=sua_url')
+  logger.error('VITE_SUPABASE_ANON_KEY=sua_key')
   throw new Error(
     'Variáveis de ambiente do Supabase não configuradas. ' +
     'Verifique se VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão definidas no arquivo .env'

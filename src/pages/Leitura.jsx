@@ -10,12 +10,13 @@ import {
   BarChart3, History, QrCode, X, Search 
 } from 'lucide-react'
 import CustomSelect from '../components/CustomSelect'
+import { logger } from '../utils/logger'
+import { CONFIG } from '../constants'
 
-// --- CONFIGURAÇÕES DO SISTEMA ---
-const N8N_WEBHOOK_URL = 'https://flux.gowork.com.br/webhook/nova-leitura' 
-const PORCENTAGEM_ALERTA = 0.60 
-const VALOR_SEM_ANDAR = '___SEM_ANDAR___'
-const CONSUMO_MINIMO_ALERTA_ABSOLUTO = 5 // Unidades (m³ ou kWh) para alerta quando a média é zero
+const N8N_WEBHOOK_URL = CONFIG.N8N_WEBHOOK_URL
+const PORCENTAGEM_ALERTA = CONFIG.PORCENTAGEM_ALERTA
+const VALOR_SEM_ANDAR = CONFIG.VALOR_SEM_ANDAR
+const CONSUMO_MINIMO_ALERTA_ABSOLUTO = 5
 
 export default function Leitura() {
   const navigate = useNavigate()
@@ -62,7 +63,7 @@ export default function Leitura() {
 
   // Função para lidar com erros do scanner
   const handleScannerError = (error) => {
-    console.error('[Leitura] Erro no scanner:', error)
+    logger.error('[Leitura] Erro no scanner:', error)
     let mensagemErro = 'Erro ao acessar a câmera.'
     
     if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
@@ -176,7 +177,7 @@ export default function Leitura() {
         if (error.code === 'PGRST116') {
           throw new Error('QR Code não cadastrado no sistema.')
         }
-        console.error('[Leitura] Erro ao buscar medidor:', error)
+        logger.error('[Leitura] Erro ao buscar medidor:', error)
         throw new Error('Erro ao buscar medidor. Tente novamente.')
       }
 
@@ -208,7 +209,7 @@ export default function Leitura() {
       // Limpa a URL para evitar que o scanner reabra ao recarregar a página
       navigate('/leitura', { replace: true })
     } catch (err) {
-      console.error('[Leitura] Erro no scan:', err)
+      logger.error('[Leitura] Erro no scan:', err)
       setMensagem({ tipo: 'erro', texto: err.message || 'Erro ao processar QR Code.' })
       setTimeout(() => setMensagem(null), 5000)
     } finally {
@@ -262,7 +263,7 @@ export default function Leitura() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('[Leitura] Erro ao buscar histórico:', error)
+        logger.error('[Leitura] Erro ao buscar histórico:', error)
         setLeituraAnterior(0)
         setMediaHistorica(null)
         setNumConsumosHistoricos(0)
@@ -282,7 +283,7 @@ export default function Leitura() {
           .limit(50) // Limita a 50 para performance
 
         if (errorTodas) {
-          console.error('[Leitura] Erro ao buscar todas as leituras:', errorTodas)
+          logger.error('[Leitura] Erro ao buscar todas as leituras:', errorTodas)
           setLeituraAnterior(0)
           setMediaHistorica(null)
           setNumConsumosHistoricos(0)
@@ -363,7 +364,7 @@ export default function Leitura() {
           const media = soma / consumos.length
           setMediaHistorica(media)
           
-          console.log('[Leitura] Média histórica calculada:', {
+          logger.debug('Leitura', 'Média histórica calculada:', {
             totalRegistros: historicoOrdenado.length,
             consumosValidos: consumos.length,
             consumos: consumos,
@@ -374,7 +375,7 @@ export default function Leitura() {
           // Se não tiver nenhum consumo válido, não calcula média
           setMediaHistorica(null)
           setNumConsumosHistoricos(0)
-          console.log('[Leitura] Média não calculada: nenhum consumo válido', {
+          logger.debug('Leitura', 'Média não calculada: nenhum consumo válido', {
             totalRegistros: historicoOrdenado.length,
             consumosValidos: consumos.length
           })
@@ -383,7 +384,7 @@ export default function Leitura() {
         // Menos de 2 registros, não calcula média
         setMediaHistorica(null)
         setNumConsumosHistoricos(0)
-        console.log('[Leitura] Média não calculada: menos de 2 registros', {
+        logger.debug('Leitura', 'Média não calculada: menos de 2 registros', {
           totalRegistros: historicoOrdenado.length
         })
       }
@@ -447,7 +448,7 @@ export default function Leitura() {
         ? ((consumo / mediaHistorica - 1) * 100).toFixed(2) + '%' 
         : 'N/A'
       
-      console.log('[Leitura] Validação de consumo excessivo:', {
+      logger.debug('Leitura', 'Validação de consumo excessivo:', {
         leituraAtual: valorAtualNum,
         leituraAnterior: valorAnteriorNum,
         consumo: consumo,
@@ -516,7 +517,7 @@ export default function Leitura() {
       })
       
       if (uploadError) {
-        console.error('[Leitura] Erro no upload:', uploadError)
+        logger.error('[Leitura] Erro no upload:', uploadError)
         if (uploadError.message.includes('already exists')) {
           throw new Error('Erro: arquivo já existe. Tente novamente.')
         } else if (uploadError.message.includes('Bucket not found')) {
@@ -584,7 +585,7 @@ export default function Leitura() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(webhookPayload)
-        }).catch(err => console.error("Erro ao enviar Webhook para n8n:", err))
+        }).catch(err => logger.error("Erro ao enviar Webhook para n8n:", err))
       }
 
       setMensagem({ tipo: 'sucesso', texto: isConsumoAlto ? 'Salvo com justificativa!' : 'Leitura salva com sucesso!' })
@@ -606,7 +607,7 @@ export default function Leitura() {
       setTimeout(() => setMensagem(null), 3000)
 
     } catch (error) {
-      console.error('[Leitura] Erro ao salvar leitura:', error)
+      logger.error('[Leitura] Erro ao salvar leitura:', error)
       let friendlyMessage = 'Erro ao salvar leitura.'
       
       if (error.message) {
