@@ -10,6 +10,7 @@ import {
   BarChart3, History, QrCode, X, Search 
 } from 'lucide-react'
 import CustomSelect from '../components/CustomSelect'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { logger } from '../utils/logger'
 import { CONFIG } from '../constants'
 
@@ -132,27 +133,60 @@ export default function Leitura() {
 
   // 3. Lógica do Scanner
   const handleMedidorScan = async (result) => {
-    if (!result || !Array.isArray(result) || result.length === 0) {
-      return
-    }
-
-    let tokenLido = null
-    
-    // Tenta extrair o token de diferentes formatos possíveis
     try {
-      if (result[0].rawValue) {
-        tokenLido = result[0].rawValue
-      } else if (result[0].text) {
-        tokenLido = result[0].text
-      } else if (typeof result[0] === 'string') {
-        tokenLido = result[0]
-      } else {
-        throw new Error('Formato de QR Code não reconhecido.')
+      // Validação robusta do resultado
+      if (!result) {
+        logger.debug('Leitura', 'Scan result vazio ou null')
+        return
       }
-    } catch (err) {
-      setMensagem({ tipo: 'erro', texto: 'Erro ao ler QR Code. Tente novamente.' })
-      return
-    }
+
+      // Verifica se é array
+      if (!Array.isArray(result)) {
+        logger.debug('Leitura', 'Scan result não é array:', typeof result)
+        // Tenta tratar como objeto único
+        if (typeof result === 'object' && result !== null) {
+          result = [result]
+        } else {
+          return
+        }
+      }
+
+      if (result.length === 0) {
+        logger.debug('Leitura', 'Scan result array vazio')
+        return
+      }
+
+      let tokenLido = null
+      
+      // Tenta extrair o token de diferentes formatos possíveis
+      try {
+        const firstResult = result[0]
+        
+        if (firstResult?.rawValue) {
+          tokenLido = firstResult.rawValue
+        } else if (firstResult?.text) {
+          tokenLido = firstResult.text
+        } else if (typeof firstResult === 'string') {
+          tokenLido = firstResult
+        } else if (typeof result === 'string') {
+          tokenLido = result
+        } else {
+          logger.error('[Leitura] Formato de QR Code não reconhecido:', firstResult)
+          setMensagem({ tipo: 'erro', texto: 'Formato de QR Code não reconhecido. Tente novamente.' })
+          return
+        }
+
+        // Valida se conseguiu extrair o token
+        if (!tokenLido || typeof tokenLido !== 'string') {
+          logger.error('[Leitura] Token não extraído corretamente:', tokenLido)
+          setMensagem({ tipo: 'erro', texto: 'Erro ao ler QR Code. Tente novamente.' })
+          return
+        }
+      } catch (err) {
+        logger.error('[Leitura] Erro ao extrair token do QR Code:', err)
+        setMensagem({ tipo: 'erro', texto: 'Erro ao ler QR Code. Tente novamente.' })
+        return
+      }
 
     // Valida formato do token
     if (!validarFormatoToken(tokenLido)) {
@@ -160,60 +194,78 @@ export default function Leitura() {
       return
     }
 
-    setMostrarScanner(false)
-    setLoading(true)
-    setMensagem(null)
+      // Fecha o scanner antes de processar
+      setMostrarScanner(false)
+      setLoading(true)
+      setMensagem(null)
 
-    try {
-      const tokenLimpo = tokenLido.trim()
-      
-      const { data: medidor, error } = await supabase
-        .from('med_medidores')
-        .select('*')
-        .eq('token', tokenLimpo) 
-        .single()
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          throw new Error('QR Code não cadastrado no sistema.')
+      try {
+        const tokenLimpo = tokenLido.trim()
+        
+        if (!tokenLimpo || tokenLimpo.length === 0) {
+          throw new Error('Token vazio após limpeza.')
         }
-        logger.error('[Leitura] Erro ao buscar medidor:', error)
-        throw new Error('Erro ao buscar medidor. Tente novamente.')
+
+        // Valida formato do token antes de buscar
+        if (!validarFormatoToken(tokenLimpo)) {
+          throw new Error('QR Code inválido. Verifique se está escaneando o código correto.')
+        }
+        
+        const { data: medidor, error } = await supabase
+          .from('med_medidores')
+          .select('*')
+          .eq('token', tokenLimpo) 
+          .single()
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            throw new Error('QR Code não cadastrado no sistema.')
+          }
+          logger.error('[Leitura] Erro ao buscar medidor:', error)
+          throw new Error('Erro ao buscar medidor. Tente novamente.')
+        }
+
+        if (!medidor) {
+          throw new Error('Medidor não encontrado.')
+        }
+
+        // Verifica se o medidor está ativo (se houver campo ativo)
+        if (medidor.ativo === false) {
+          throw new Error('Este medidor está inativo.')
+        }
+
+        if (medidor.tipo !== tipoAtivo) {
+          // Adiciona temporariamente o medidor escaneado à lista atual
+          setTodosMedidores(prev => 
+            prev.some(m => m.id === medidor.id) ? prev : [...prev, medidor]
+          )
+          // Dispara a mudança de tipo
+          setTipoAtivo(medidor.tipo)
+        }
+
+        setPredioSelecionado(medidor.local_unidade || '')
+        setAndarSelecionado(medidor.andar || VALOR_SEM_ANDAR)
+        setMedidorSelecionado(medidor.id)
+        
+        setMensagem({ tipo: 'sucesso', texto: `Medidor identificado: ${medidor.nome || 'Sem nome'}` })
+        setTimeout(() => setMensagem(null), 3000)
+
+        // Limpa a URL para evitar que o scanner reabra ao recarregar a página
+        navigate('/leitura', { replace: true })
+      } catch (err) {
+        logger.error('[Leitura] Erro no processamento do scan:', err)
+        const mensagemErro = err?.message || 'Erro ao processar QR Code.'
+        setMensagem({ tipo: 'erro', texto: mensagemErro })
+        setTimeout(() => setMensagem(null), 5000)
+      } finally {
+        setLoading(false)
       }
-
-      if (!medidor) {
-        throw new Error('Medidor não encontrado.')
-      }
-
-      // Verifica se o medidor está ativo (se houver campo ativo)
-      if (medidor.ativo === false) {
-        throw new Error('Este medidor está inativo.')
-      }
-
-      if (medidor.tipo !== tipoAtivo) {
-        // Adiciona temporariamente o medidor escaneado à lista atual
-        setTodosMedidores(prev => 
-          prev.some(m => m.id === medidor.id) ? prev : [...prev, medidor]
-        )
-        // Dispara a mudança de tipo
-        setTipoAtivo(medidor.tipo)
-      }
-
-      setPredioSelecionado(medidor.local_unidade || '')
-      setAndarSelecionado(medidor.andar || VALOR_SEM_ANDAR)
-      setMedidorSelecionado(medidor.id)
-      
-      setMensagem({ tipo: 'sucesso', texto: `Medidor identificado: ${medidor.nome || 'Sem nome'}` })
-      setTimeout(() => setMensagem(null), 3000)
-
-      // Limpa a URL para evitar que o scanner reabra ao recarregar a página
-      navigate('/leitura', { replace: true })
     } catch (err) {
-      logger.error('[Leitura] Erro no scan:', err)
-      setMensagem({ tipo: 'erro', texto: err.message || 'Erro ao processar QR Code.' })
+      // Captura qualquer erro não tratado acima
+      logger.error('[Leitura] Erro crítico no handleMedidorScan:', err)
+      setMostrarScanner(false)
+      setMensagem({ tipo: 'erro', texto: 'Erro inesperado ao processar QR Code. Tente novamente.' })
       setTimeout(() => setMensagem(null), 5000)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -746,23 +798,70 @@ export default function Leitura() {
                 Aponte para o QR Code do Relógio
               </h3>
               
-              <div className="rounded-2xl overflow-hidden border-2 border-cyan-400">
-                <Scanner 
-                  key={scannerKey}
-                  onScan={handleMedidorScan}
-                  onError={handleScannerError}
-                  scanDelay={500}
-                  allowMultiple={false}
-                  constraints={{
-                    facingMode: 'environment' // Prefere câmera traseira
-                  }}
-                />
+              <div className="rounded-2xl overflow-hidden border-2 border-cyan-400 relative min-h-[300px] bg-gray-900">
+                <ErrorBoundary>
+                  {(() => {
+                    try {
+                      return (
+                        <Scanner 
+                          key={scannerKey}
+                          onScan={(result) => {
+                            try {
+                              handleMedidorScan(result)
+                            } catch (err) {
+                              logger.error('[Leitura] Erro no onScan:', err)
+                              handleScannerError(err)
+                            }
+                          }}
+                          onError={(error) => {
+                            try {
+                              logger.error('[Leitura] Erro do Scanner:', error)
+                              handleScannerError(error)
+                            } catch (err) {
+                              logger.error('[Leitura] Erro crítico no onError:', err)
+                              setMostrarScanner(false)
+                              setMensagem({ tipo: 'erro', texto: 'Erro ao acessar a câmera. Verifique as permissões e tente novamente.' })
+                            }
+                          }}
+                          scanDelay={500}
+                          allowMultiple={false}
+                          constraints={{
+                            facingMode: 'environment' // Prefere câmera traseira
+                          }}
+                        />
+                      )
+                    } catch (err) {
+                      logger.error('[Leitura] Erro ao renderizar Scanner:', err)
+                      return (
+                        <div className="p-8 text-center text-white">
+                          <p className="mb-4 text-lg font-semibold">Erro ao inicializar scanner</p>
+                          <p className="mb-6 text-sm text-gray-300">
+                            {err?.message || 'Erro desconhecido ao acessar a câmera.'}
+                          </p>
+                          <button
+                            onClick={() => {
+                              setMostrarScanner(false)
+                              setMensagem({ tipo: 'erro', texto: 'Erro ao acessar a câmera. Verifique as permissões nas configurações do navegador.' })
+                            }}
+                            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                          >
+                            Fechar
+                          </button>
+                        </div>
+                      )
+                    }
+                  })()}
+                </ErrorBoundary>
               </div>
               
               <button 
                 onClick={() => {
-                  setMostrarScanner(false)
-                  setCameraError(null)
+                  try {
+                    setMostrarScanner(false)
+                    setCameraError(null)
+                  } catch (err) {
+                    logger.error('[Leitura] Erro ao fechar scanner:', err)
+                  }
                 }} 
                 className="mt-6 w-full py-3 bg-white/20 border border-white/30 text-white rounded-xl font-bold hover:bg-white/30 transition-colors"
               >

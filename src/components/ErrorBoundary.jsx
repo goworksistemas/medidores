@@ -15,6 +15,12 @@ class ErrorBoundary extends React.Component {
     console.error('[ErrorBoundary] Erro capturado:', error, errorInfo)
     this.setState({ errorInfo })
     
+    // Log mais detalhado em desenvolvimento
+    if (import.meta.env.DEV) {
+      console.error('[ErrorBoundary] Stack:', error.stack)
+      console.error('[ErrorBoundary] Component Stack:', errorInfo.componentStack)
+    }
+    
     // Aqui você pode enviar para um serviço de monitoramento (ex: Sentry)
     // Exemplo: Sentry.captureException(error, { extra: errorInfo })
   }
@@ -40,15 +46,29 @@ class ErrorBoundary extends React.Component {
               Ocorreu um erro inesperado na aplicação. Por favor, recarregue a página.
             </p>
 
-            {import.meta.env.DEV && this.state.error && (
+            {(import.meta.env.DEV || this.state.error?.message?.includes('Scanner')) && this.state.error && (
               <details className="mb-6 text-left bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <summary className="cursor-pointer text-sm font-semibold text-gray-700 mb-2">
-                  Detalhes do erro (apenas em desenvolvimento)
+                  Detalhes do erro {import.meta.env.DEV ? '(desenvolvimento)' : ''}
                 </summary>
-                <pre className="text-xs text-red-600 overflow-auto max-h-40">
-                  {this.state.error.toString()}
-                  {this.state.errorInfo?.componentStack}
-                </pre>
+                <div className="text-xs text-red-600 space-y-2">
+                  <div>
+                    <strong>Erro:</strong> {this.state.error.toString()}
+                  </div>
+                  {this.state.error?.message && (
+                    <div>
+                      <strong>Mensagem:</strong> {this.state.error.message}
+                    </div>
+                  )}
+                  {import.meta.env.DEV && this.state.errorInfo?.componentStack && (
+                    <div>
+                      <strong>Stack:</strong>
+                      <pre className="mt-1 overflow-auto max-h-40 whitespace-pre-wrap">
+                        {this.state.errorInfo.componentStack}
+                      </pre>
+                    </div>
+                  )}
+                </div>
               </details>
             )}
 
