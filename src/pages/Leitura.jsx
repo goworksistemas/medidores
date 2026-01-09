@@ -33,6 +33,7 @@ export default function Leitura() {
   const [leituraAtual, setLeituraAtual] = useState('')
   const [mediaHistorica, setMediaHistorica] = useState(null)
   const [numConsumosHistoricos, setNumConsumosHistoricos] = useState(0)
+  const [ultimasLeituras, setUltimasLeituras] = useState([]) // Últimas 2 leituras para exibição
   
   // Estados de Foto e Upload
   const [foto, setFoto] = useState(null)
@@ -244,53 +245,150 @@ export default function Leitura() {
       // Busca histórico diretamente das tabelas corretas
       const tabela = tipoAtivo === 'agua' ? 'med_hidrometros' : 'med_energia'
 
-      // Busca as últimas 11 leituras para calcular 10 períodos de consumo
+      // Calcula a data de 10 dias atrás (início do dia)
+      const dataLimite = new Date()
+      dataLimite.setDate(dataLimite.getDate() - 10)
+      dataLimite.setHours(0, 0, 0, 0)
+      const dataLimiteStr = dataLimite.toISOString()
+
+      // Primeiro, tenta buscar todos os registros dos últimos 10 dias
+      // Não limita a quantidade, pois pode haver múltiplos registros por dia
       const { data: historico, error } = await supabase
         .from(tabela)
-        .select('leitura')
+        .select('leitura, created_at')
         .eq('medidor_id', medidorSelecionado)
+        .gte('created_at', dataLimiteStr)
         .order('created_at', { ascending: false })
-        .limit(11)
 
-      if (error || !historico || historico.length === 0) {
+      if (error) {
+        console.error('[Leitura] Erro ao buscar histórico:', error)
         setLeituraAnterior(0)
         setMediaHistorica(null)
         setNumConsumosHistoricos(0)
         return
       }
 
-      // A leitura mais recente é a "anterior" para o novo registro
-      setLeituraAnterior(Number(historico[0].leitura))
+      // Se não houver registros nos últimos 10 dias, busca todas as leituras do medidor
+      // (mas limita a um número razoável para não sobrecarregar)
+      let leiturasParaProcessar = historico || []
+      
+      if (leiturasParaProcessar.length === 0) {
+        const { data: todasLeituras, error: errorTodas } = await supabase
+          .from(tabela)
+          .select('leitura, created_at')
+          .eq('medidor_id', medidorSelecionado)
+          .order('created_at', { ascending: false })
+          .limit(50) // Limita a 50 para performance
 
-      // Calcula a média de consumo se houver dados suficientes
-      if (historico.length > 1) {
+        if (errorTodas) {
+          console.error('[Leitura] Erro ao buscar todas as leituras:', errorTodas)
+          setLeituraAnterior(0)
+          setMediaHistorica(null)
+          setNumConsumosHistoricos(0)
+          return
+        }
+
+        leiturasParaProcessar = todasLeituras || []
+      } else {
+        // Se encontrou registros nos últimos 10 dias, usa apenas esses (limitado a 11)
+        // Mas se houver menos de 11, já está correto
+      }
+
+      // Se encontrou registros nos últimos 10 dias, limita aos últimos 11 registros
+      // (11 para ter 10 períodos de consumo entre eles)
+      if (leiturasParaProcessar.length > 11) {
+        leiturasParaProcessar = leiturasParaProcessar.slice(0, 11)
+      }
+
+      // Processa o histórico
+      processarHistorico(leiturasParaProcessar)
+    }
+
+    function processarHistorico(historico) {
+      if (!historico || historico.length === 0) {
+        setLeituraAnterior(0)
+        setMediaHistorica(null)
+        setNumConsumosHistoricos(0)
+        setUltimasLeituras([])
+        return
+      }
+
+      // Ordena por data (mais recente primeiro) caso não esteja ordenado
+      const historicoOrdenado = [...historico].sort((a, b) => {
+        const dataA = new Date(a.created_at)
+        const dataB = new Date(b.created_at)
+        return dataB - dataA
+      })
+
+      // A leitura mais recente é a "anterior" para o novo registro
+      const leituraMaisRecente = Number(historicoOrdenado[0].leitura)
+      setLeituraAnterior(isNaN(leituraMaisRecente) ? 0 : leituraMaisRecente)
+
+      // Armazena as últimas 2 leituras para exibição no resumo
+      const ultimasDuasLeituras = historicoOrdenado.slice(0, 2).map(item => ({
+        leitura: Number(item.leitura),
+        data: new Date(item.created_at)
+      }))
+      setUltimasLeituras(ultimasDuasLeituras)
+
+      // Calcula a média de consumo se houver pelo menos 2 registros
+      if (historicoOrdenado.length >= 2) {
         const consumos = []
-        for (let i = 0; i < historico.length - 1; i++) {
-          const atual = Number(historico[i].leitura)
-          const anterior = Number(historico[i + 1].leitura)
+        
+        // Calcula o consumo entre cada par de leituras consecutivas
+        for (let i = 0; i < historicoOrdenado.length - 1; i++) {
+          const atual = Number(historicoOrdenado[i].leitura)
+          const anterior = Number(historicoOrdenado[i + 1].leitura)
+          
+          // Valida se os números são válidos
+          if (isNaN(atual) || isNaN(anterior)) continue
+          
           const consumoCalculado = atual - anterior
-          if (consumoCalculado >= 0) { // Ignora "viradas de relógio" para a média
+          
+          // Ignora "viradas de relógio" (consumo negativo) para a média
+          // Mas permite consumo zero
+          if (consumoCalculado >= 0) {
             consumos.push(consumoCalculado)
           }
         }
 
         setNumConsumosHistoricos(consumos.length)
 
-        if (consumos.length > 0) {
+        // Calcula a média se tiver pelo menos 1 consumo válido (ou seja, pelo menos 2 registros)
+        // Se tiver apenas 1 consumo, usa esse valor como média
+        // Se tiver 2 ou mais consumos, calcula a média aritmética
+        if (consumos.length >= 1) {
           const soma = consumos.reduce((a, b) => a + b, 0)
-          setMediaHistorica(soma / consumos.length)
+          const media = soma / consumos.length
+          setMediaHistorica(media)
+          
+          console.log('[Leitura] Média histórica calculada:', {
+            totalRegistros: historicoOrdenado.length,
+            consumosValidos: consumos.length,
+            consumos: consumos,
+            media: media,
+            limiteExcessivo: media * (1 + PORCENTAGEM_ALERTA)
+          })
         } else {
+          // Se não tiver nenhum consumo válido, não calcula média
           setMediaHistorica(null)
+          setNumConsumosHistoricos(0)
+          console.log('[Leitura] Média não calculada: nenhum consumo válido', {
+            totalRegistros: historicoOrdenado.length,
+            consumosValidos: consumos.length
+          })
         }
       } else {
+        // Menos de 2 registros, não calcula média
         setMediaHistorica(null)
         setNumConsumosHistoricos(0)
+        console.log('[Leitura] Média não calculada: menos de 2 registros', {
+          totalRegistros: historicoOrdenado.length
+        })
       }
     }
+
     fetchDadosMedidor()
-    // Otimização: A dependência `todosMedidores` não é estritamente necessária aqui.
-    // O efeito só precisa ser executado novamente quando o ID do medidor selecionado ou o tipo do medidor mudar.
-    // A lógica interna já lida com casos em que os detalhes do medidor não estão na lista local.
   }, [medidorSelecionado, tipoAtivo])
 
   const handleFileSelect = (e) => {
@@ -323,16 +421,57 @@ export default function Leitura() {
   }
 
   // --- VALIDAÇÕES E CÁLCULOS ---
-  const valorAtualNum = Number(leituraAtual)
-  const valorAnteriorNum = Number(leituraAnterior)
-  const consumo = leituraAtual ? valorAtualNum - valorAnteriorNum : 0
+  const valorAtualNum = leituraAtual ? Number(leituraAtual) : null
+  const valorAnteriorNum = leituraAnterior !== null ? Number(leituraAnterior) : null
+  const consumo = (valorAtualNum !== null && valorAnteriorNum !== null) ? valorAtualNum - valorAnteriorNum : null
   
-  const isMenorQueAnterior = leituraAtual && leituraAnterior !== null && valorAtualNum < valorAnteriorNum
-  const isConsumoAlto = numConsumosHistoricos >= 3 && !isMenorQueAnterior && mediaHistorica > 0 && consumo > (mediaHistorica * (1 + PORCENTAGEM_ALERTA))
+  const isMenorQueAnterior = valorAtualNum !== null && valorAnteriorNum !== null && valorAtualNum < valorAnteriorNum
+  
+  // Consumo excessivo: quando ultrapassar 60% acima da média histórica (consumo > media * 1.60)
+  // Precisa ter pelo menos 1 consumo histórico válido (ou seja, pelo menos 2 registros) para calcular a média
+  const limiteConsumoExcessivo = mediaHistorica !== null && mediaHistorica > 0 ? mediaHistorica * (1 + PORCENTAGEM_ALERTA) : null
+  const isConsumoAlto = numConsumosHistoricos >= 1 && 
+                        !isMenorQueAnterior && 
+                        mediaHistorica !== null && 
+                        mediaHistorica > 0 && 
+                        consumo !== null && 
+                        consumo > 0 &&
+                        limiteConsumoExcessivo !== null &&
+                        consumo > limiteConsumoExcessivo
+
+  // Debug: Log dos valores calculados
+  useEffect(() => {
+    if (leituraAtual && leituraAnterior !== null) {
+      const porcentagemAcima = limiteConsumoExcessivo && consumo !== null && mediaHistorica > 0 
+        ? ((consumo / mediaHistorica - 1) * 100).toFixed(2) + '%' 
+        : 'N/A'
+      
+      console.log('[Leitura] Validação de consumo excessivo:', {
+        leituraAtual: valorAtualNum,
+        leituraAnterior: valorAnteriorNum,
+        consumo: consumo,
+        mediaHistorica: mediaHistorica,
+        limiteExcessivo: limiteConsumoExcessivo,
+        porcentagemAcima: porcentagemAcima,
+        numConsumosHistoricos: numConsumosHistoricos,
+        isConsumoAlto: isConsumoAlto,
+        isMenorQueAnterior: isMenorQueAnterior,
+        condicoes: {
+          temConsumosHistoricos: numConsumosHistoricos >= 1,
+          naoMenorQueAnterior: !isMenorQueAnterior,
+          temMedia: mediaHistorica !== null && mediaHistorica > 0,
+          temConsumo: consumo !== null && consumo > 0,
+          temLimite: limiteConsumoExcessivo !== null,
+          consumoMaiorQueLimite: consumo !== null && limiteConsumoExcessivo !== null ? consumo > limiteConsumoExcessivo : false
+        }
+      })
+    }
+  }, [leituraAtual, leituraAnterior, consumo, mediaHistorica, numConsumosHistoricos, isConsumoAlto, isMenorQueAnterior, limiteConsumoExcessivo, valorAtualNum, valorAnteriorNum])
 
   const podeEnviar = leituraAtual && foto && 
                      (!isMenorQueAnterior || motivoValidacao !== '') &&
-                     (!isConsumoAlto || justificativa.length > 3)
+                     (!isConsumoAlto || justificativa.length > 3) &&
+                     consumo !== null
 
   // 5. Submit (ENVIO DOS DADOS COMPLETOS)
   async function handleSubmit(e) {
@@ -396,7 +535,7 @@ export default function Leitura() {
 
       let obsFinal = ''
       let porcentagemAcimaMedia = null
-      if (isConsumoAlto) {
+      if (isConsumoAlto && consumo !== null && mediaHistorica !== null && mediaHistorica > 0) {
         porcentagemAcimaMedia = Math.round(((consumo / mediaHistorica) - 1) * 100)
         obsFinal = `ALERTA: Consumo +${porcentagemAcimaMedia}% acima da média.`
       }
@@ -422,7 +561,7 @@ export default function Leitura() {
       
       // --- LÓGICA DO WEBHOOK PARA N8N ---
       // Dispara o webhook apenas se o consumo for alto
-      if (N8N_WEBHOOK_URL && isConsumoAlto) {
+      if (N8N_WEBHOOK_URL && isConsumoAlto && consumo !== null) {
         const medidor = todosMedidores.find(m => m.id === medidorSelecionado)
 
         const webhookPayload = {
@@ -458,6 +597,10 @@ export default function Leitura() {
       setMedidorSelecionado('') 
       setPredioSelecionado('')
       setAndarSelecionado('')
+      setUltimasLeituras([])
+      setLeituraAnterior(null)
+      setMediaHistorica(null)
+      setNumConsumosHistoricos(0)
       
       setTimeout(() => setMensagem(null), 3000)
 
@@ -737,7 +880,7 @@ export default function Leitura() {
                 disabled={!medidorSelecionado}
               />
 
-               {isConsumoAlto && (
+               {isConsumoAlto && consumo !== null && mediaHistorica !== null && (
                  <div className="mt-6 animate-in fade-in slide-in-from-top-4">
                    <div className="bg-red-100 border-l-4 border-red-500 p-4 rounded-r-lg mb-4">
                      <p className="text-red-800 font-bold flex items-center gap-2">
@@ -745,8 +888,13 @@ export default function Leitura() {
                        Atenção: Consumo fora do padrão
                      </p>
                      <p className="text-red-700 text-sm mt-1">
-                       O valor inserido representa um aumento de <strong>{Math.round(((consumo/mediaHistorica)-1)*100)}%</strong> em relação à média dos últimos 10 registros.
+                       O valor inserido representa um aumento de <strong>{Math.round(((consumo/mediaHistorica)-1)*100)}%</strong> em relação à média histórica ({mediaHistorica.toFixed(2)} {tipoAtivo === 'agua' ? 'm³' : 'kWh'}).
                      </p>
+                     {numConsumosHistoricos < 10 && (
+                       <p className="text-red-600 text-xs mt-2 italic">
+                         Média calculada com {numConsumosHistoricos} registro(s) disponível(is).
+                       </p>
+                     )}
                    </div>
                    
                    <label className="block text-sm font-bold text-red-800 uppercase mb-2">
@@ -856,14 +1004,42 @@ export default function Leitura() {
               </h3>
               
               <div className="space-y-4">
-                 <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                   <p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Leitura Anterior</p>
-                   <p className="text-3xl font-bold text-gray-700 font-mono tracking-tight">
-                     {leituraAnterior} <span className="text-sm font-normal text-gray-400">{tipoAtivo === 'agua' ? 'm³' : 'kWh'}</span>
-                   </p>
-                 </div>
+                 {/* Últimas 2 Leituras */}
+                 {ultimasLeituras.length > 0 && (
+                   <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
+                     <p className="text-xs text-blue-600 uppercase font-bold tracking-wider mb-3">Últimas 2 Leituras</p>
+                     <div className="space-y-3">
+                       {ultimasLeituras.map((item, index) => {
+                         const dataFormatada = item.data.toLocaleDateString('pt-BR', { 
+                           day: '2-digit', 
+                           month: '2-digit', 
+                           year: 'numeric' 
+                         })
+                         const horaFormatada = item.data.toLocaleTimeString('pt-BR', { 
+                           hour: '2-digit', 
+                           minute: '2-digit' 
+                         })
+                         return (
+                           <div key={index} className={`p-3 rounded-lg border ${index === 0 ? 'bg-white border-blue-300 shadow-sm' : 'bg-blue-50/50 border-blue-200'}`}>
+                             <div className="flex items-center justify-between mb-1">
+                               <span className="text-xs font-semibold text-blue-700">
+                                 {index === 0 ? 'Mais Recente' : 'Anterior'}
+                               </span>
+                               <span className="text-[10px] text-blue-500 font-medium">
+                                 {dataFormatada} {horaFormatada}
+                               </span>
+                             </div>
+                             <p className={`font-mono tracking-tight ${index === 0 ? 'text-2xl font-bold text-gray-800' : 'text-xl font-semibold text-gray-700'}`}>
+                               {item.leitura.toLocaleString('pt-BR')} <span className="text-sm font-normal text-blue-500">{tipoAtivo === 'agua' ? 'm³' : 'kWh'}</span>
+                             </p>
+                           </div>
+                         )
+                       })}
+                     </div>
+                   </div>
+                 )}
                  
-                 {leituraAtual && (
+                 {leituraAtual && consumo !== null && (
                    <div className={`p-4 rounded-xl border transition-colors ${
                      isConsumoAlto 
                        ? 'bg-red-50 border-red-200' 
@@ -879,7 +1055,7 @@ export default function Leitura() {
                      <p className={`text-4xl font-black font-mono tracking-tight ${
                        isConsumoAlto ? 'text-red-600' : isMenorQueAnterior ? 'text-orange-600' : 'text-green-600'
                      }`}>
-                       {consumo}
+                       {consumo.toFixed(2)}
                      </p>
                    </div>
                  )}

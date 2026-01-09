@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import ErrorBoundary from './components/ErrorBoundary'
 
 import Layout from './components/Layout'
 import Leitura from './pages/Leitura'
@@ -108,29 +109,31 @@ function RotaPrivada({ children }) {
 
 function App() {
   return (
-    <AuthProvider>
-      <ThemeProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/aguardando-aprovacao" element={<AguardandoAprovacao />} />
-            
-            <Route path="/" element={
-              <RotaPrivada>
-                <Layout />
-              </RotaPrivada>
-            }>
-              <Route index element={<OpcaoEntrada />} />
-              <Route path="leitura" element={<Leitura />} />
-              <Route path="historico" element={<Historico />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="usuarios" element={<GerenciarUsuarios />} />
-              <Route path="medidores" element={<GerenciarMedidores />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </ThemeProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ThemeProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/aguardando-aprovacao" element={<AguardandoAprovacao />} />
+              
+              <Route path="/" element={
+                <RotaPrivada>
+                  <Layout />
+                </RotaPrivada>
+              }>
+                <Route index element={<OpcaoEntrada />} />
+                <Route path="leitura" element={<Leitura />} />
+                <Route path="historico" element={<Historico />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="usuarios" element={<GerenciarUsuarios />} />
+                <Route path="medidores" element={<GerenciarMedidores />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </ThemeProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 
