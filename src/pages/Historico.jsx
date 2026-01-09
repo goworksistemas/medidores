@@ -68,7 +68,6 @@ export default function Historico() {
     
     const tabela = tipoAtivo === 'agua' ? 'med_hidrometros' : 'med_energia'
 
-    // A consulta agora é relacional para buscar o nome do medidor
     let query = supabase
       .from(tabela)
       .select('*, medidor:med_medidores(nome, local_unidade, andar)', { count: 'exact' })
@@ -84,30 +83,50 @@ export default function Historico() {
       }
     }
     if (termoBusca) query = query.ilike('medidor.nome', `%${termoBusca}%`)
+    if (dataInicio) query = query.gte('created_at', `${dataInicio}T00:00:00`)
+    if (dataFim) query = query.lte('created_at', `${dataFim}T23:59:59`)
 
-    // Filtro de data
-    if (dataInicio) {
-      query = query.gte('created_at', `${dataInicio}T00:00:00`)
-    }
-    
-    if (dataFim) {
-      query = query.lte('created_at', `${dataFim}T23:59:59`)
-    }
-
-    // Paginação
+    // Paginação - Pega um item a mais para o cálculo do consumo
     const de = (paginaAtual - 1) * ITENS_POR_PAGINA
-    const ate = de + ITENS_POR_PAGINA - 1
+    const ate = de + ITENS_POR_PAGINA // Pega 51 itens
     query = query.range(de, ate)
     
     const { data, count, error } = await query
 
     if (error) {
       console.error('Erro ao buscar:', error)
+      setLeituras([])
+      setTotalRegistros(0)
     } else {
-      // Calcula o consumo para cada linha (leitura atual - leitura anterior)
-      // Esta é uma simplificação. Para um cálculo preciso, precisaríamos da leitura anterior real.
-      // Por enquanto, exibiremos apenas a leitura atual.
-      setLeituras(data || [])
+      const leiturasComConsumo = []
+      for (let i = 0; i < data.length; i++) {
+        // O último item da lista (o item 'extra') não tem um próximo para comparar
+        if (i >= ITENS_POR_PAGINA) continue
+
+        const leituraAtual = data[i]
+        const leituraAnterior = data[i + 1]
+        
+        let consumo = null
+        if (leituraAnterior) {
+          const diferenca = leituraAtual.leitura - leituraAnterior.leitura
+          
+          if (diferenca < 0) {
+            // Se for uma virada de relógio confirmada pelo usuário na tela de leitura
+            if (leituraAtual.observacao?.includes('ROLLOVER_CONFIRMADO')) {
+              consumo = 0 // A medição recomeça, então o consumo do período é 0
+            } else {
+              // Caso contrário, é um erro de digitação, então não calculamos o consumo
+              consumo = null
+            }
+          } else {
+            consumo = diferenca
+          }
+        }
+        
+        leiturasComConsumo.push({ ...leituraAtual, consumo })
+      }
+      
+      setLeituras(leiturasComConsumo)
       setTotalRegistros(count || 0)
     }
     setLoading(false)
@@ -287,6 +306,7 @@ export default function Historico() {
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Andar</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Relógio</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Leitura</th>
+                  <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Consumo</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Foto</th>
                   <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Ações</th>
                 </tr>
@@ -294,11 +314,11 @@ export default function Historico() {
               <tbody className="divide-y divide-gray-100">
                 {loading ? (
                   <tr>
-                    <td colSpan="7" className="p-8 text-center text-gray-400">Carregando dados...</td>
+                    <td colSpan="8" className="p-8 text-center text-gray-400">Carregando dados...</td>
                   </tr>
                 ) : leituras.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="p-8 text-center text-gray-400">Nenhum registro encontrado com estes filtros.</td>
+                    <td colSpan="8" className="p-8 text-center text-gray-400">Nenhum registro encontrado com estes filtros.</td>
                   </tr>
                 ) : (
                   leituras.map((item) => {
@@ -311,7 +331,7 @@ export default function Historico() {
                     
                     // Formata número ou retorna "-"
                     const formatNum = (val) => {
-                      if (!val || val === 'NÃO HÁ REGISTRO ANTERIOR' || val === 'NÃO HÁ REGISTRO PARA PARÂMETRO') return '-'
+                      if (val === null || val === undefined || val === 'NÃO HÁ REGISTRO ANTERIOR' || val === 'NÃO HÁ REGISTRO PARA PARÂMETRO') return '-'
                       const num = Number(val)
                       return !isNaN(num) ? num.toLocaleString('pt-BR') : '-'
                     }
@@ -349,6 +369,18 @@ export default function Historico() {
                                 <span className="text-[10px] text-gray-400 ml-1">{unidadeMedida}</span>
                               )}
                             </>
+                          )}
+                        </td>
+
+                        {/* Consumo */}
+                        <td className="p-4 text-right">
+                          {item.consumo !== null && item.consumo !== undefined ? (
+                            <>
+                              <span className="font-mono font-semibold text-blue-600">{formatNum(item.consumo)}</span>
+                                <span className="text-[10px] text-blue-400 ml-1">{unidadeMedida}</span>
+                            </>
+                          ) : (
+                            <span className="text-gray-400 text-xs">N/A</span>
                           )}
                         </td>
                         

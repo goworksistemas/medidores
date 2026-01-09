@@ -395,7 +395,9 @@ export default function Leitura() {
         obsFinal = `ALERTA: Consumo +${porcentagemAcimaMedia}% acima da média.`
       }
       if (isMenorQueAnterior) {
-        obsFinal = motivoValidacao === 'virada' ? 'Virada de Relógio' : 'Ajuste Manual'
+        obsFinal = motivoValidacao === 'virada' 
+          ? 'ROLLOVER_CONFIRMADO: Virada de Relógio' 
+          : 'Ajuste Manual'
       }
 
       const dadosLeitura = {
