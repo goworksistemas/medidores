@@ -491,6 +491,88 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* CARDS PRINCIPAIS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+          {/* Consumo Total */}
+          <div className={`relative overflow-hidden rounded-3xl p-4 sm:p-6 shadow-xl ${
+            tipoAtivo === 'agua' 
+              ? 'bg-gradient-to-br from-sky-500 to-blue-600' 
+              : 'bg-gradient-to-br from-amber-400 to-orange-500'
+          } text-white`}>
+            <div className="absolute -right-4 -top-4 sm:-right-6 sm:-top-6 opacity-20">
+              {tipoAtivo === 'agua' ? <Droplets size={60} className="sm:hidden" /> : <Zap size={60} className="sm:hidden" />}
+              {tipoAtivo === 'agua' ? <Droplets size={100} className="hidden sm:block" /> : <Zap size={100} className="hidden sm:block" />}
+            </div>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider opacity-80 mb-1 sm:mb-2">Consumo Total</p>
+            <div className="flex items-baseline gap-1 sm:gap-2">
+              <h3 className="text-xl sm:text-3xl md:text-4xl font-black">
+                {kpis.total.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+              </h3>
+              <span className="text-[10px] sm:text-sm font-bold opacity-70">{unidadeMedida}</span>
+            </div>
+          </div>
+
+          {/* Estatísticas */}
+          <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+              <h3 className="text-sm font-bold text-gray-800">Estatísticas</h3>
+            </div>
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3">
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Média Diária</p>
+              <p className="text-xl sm:text-2xl font-black text-gray-900">
+                {kpis.media.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
+                <span className="text-xs font-medium text-gray-500 ml-1">{unidadeMedida}/dia</span>
+              </p>
+            </div>
+          </div>
+          
+          {/* Registros */}
+          <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Activity className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-blue-600' : 'text-amber-600'}`} />
+              <h3 className="text-sm font-bold text-gray-800">Registros</h3>
+            </div>
+            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-3">
+              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Total</p>
+              <p className="text-xl sm:text-2xl font-black text-blue-700">
+                {kpis.totalRegistros.toLocaleString('pt-BR')}
+                <span className="text-xs font-medium text-blue-600 ml-1">leituras</span>
+              </p>
+            </div>
+          </div>
+          
+          {/* Maior Pico */}
+          <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <ArrowUpRight className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-emerald-600' : 'text-orange-600'}`} />
+              <h3 className="text-sm font-bold text-gray-800">Maior Pico</h3>
+            </div>
+            <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-3">
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Consumo</p>
+              <p className="text-xl sm:text-2xl font-black text-emerald-700">
+                {kpis.maiorRegistro.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
+                <span className="text-xs font-medium text-emerald-600 ml-1">{unidadeMedida}</span>
+              </p>
+            </div>
+          </div>
+          
+          {/* Período */}
+          <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-purple-600' : 'text-pink-600'}`} />
+              <h3 className="text-sm font-bold text-gray-800">Período</h3>
+            </div>
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-3">
+              <p className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mb-1">Dias Ativos</p>
+              <p className="text-xl sm:text-2xl font-black text-purple-700">
+                {dadosTendencia.length > 0 ? dadosTendencia.length : 0}
+                <span className="text-xs font-medium text-purple-600 ml-1">dias</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* FILTROS */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-200/50 overflow-hidden">
           <button
@@ -642,76 +724,6 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-6">
             
-            {/* CARDS DE KPI */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-              {/* Total */}
-              <div className={`relative overflow-hidden rounded-2xl sm:rounded-3xl p-4 sm:p-6 ${
-                tipoAtivo === 'agua' 
-                  ? 'bg-gradient-to-br from-sky-500 to-blue-600' 
-                  : 'bg-gradient-to-br from-amber-400 to-orange-500'
-              } text-white shadow-xl`}>
-                <div className="absolute -right-4 -top-4 sm:-right-6 sm:-top-6 opacity-20">
-                  {tipoAtivo === 'agua' ? <Droplets size={60} className="sm:hidden" /> : <Zap size={60} className="sm:hidden" />}
-                  {tipoAtivo === 'agua' ? <Droplets size={100} className="hidden sm:block" /> : <Zap size={100} className="hidden sm:block" />}
-                </div>
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider opacity-80 mb-1 sm:mb-2">Consumo Total</p>
-                <div className="flex items-baseline gap-1 sm:gap-2">
-                  <h3 className="text-xl sm:text-3xl md:text-4xl font-black">
-                    {kpis.total.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                  </h3>
-                  <span className="text-[10px] sm:text-sm font-bold opacity-70">{unidadeMedida}</span>
-                </div>
-              </div>
-
-              {/* Média */}
-              <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2 mb-1 sm:mb-2">
-                  <div className="p-1.5 sm:p-2 bg-emerald-100 rounded-xl">
-                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600" />
-                  </div>
-                </div>
-                <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Média/Dia</p>
-                <div className="flex items-baseline gap-1">
-                  <h3 className="text-lg sm:text-2xl md:text-3xl font-black text-gray-900">
-                    {kpis.media.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
-                  </h3>
-                  <span className="text-[10px] sm:text-xs font-medium text-gray-400">{unidadeMedida}</span>
-                </div>
-              </div>
-
-              {/* Pico */}
-              <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2 mb-1 sm:mb-2">
-                  <div className="p-1.5 sm:p-2 bg-red-100 rounded-xl">
-                    <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4 text-red-600" />
-                  </div>
-                </div>
-                <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Maior Pico</p>
-                <div className="flex items-baseline gap-1">
-                  <h3 className="text-lg sm:text-2xl md:text-3xl font-black text-gray-900">
-                    {kpis.maiorRegistro.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
-                  </h3>
-                  <span className="text-[10px] sm:text-xs font-medium text-gray-400">{unidadeMedida}</span>
-                </div>
-              </div>
-
-              {/* Registros */}
-              <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-2 mb-1 sm:mb-2">
-                  <div className="p-1.5 sm:p-2 bg-violet-100 rounded-xl">
-                    <Activity className="w-3 h-3 sm:w-4 sm:h-4 text-violet-600" />
-                  </div>
-                </div>
-                <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Registros</p>
-                <div className="flex items-baseline gap-1">
-                  <h3 className="text-lg sm:text-2xl md:text-3xl font-black text-gray-900">
-                    {kpis.totalRegistros.toLocaleString('pt-BR')}
-                  </h3>
-                  <span className="text-[10px] sm:text-xs font-medium text-gray-400">leituras</span>
-                </div>
-              </div>
-            </div>
-
             {/* GRÁFICOS */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 xl:gap-8">
               
@@ -733,7 +745,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                <div className="h-64 sm:h-80 w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400" style={{ scrollbarWidth: 'thin' }}>
+                <div className="h-64 sm:h-80 w-full overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400" style={{ scrollbarWidth: 'thin' }}>
                   {dadosTendencia.length > 0 ? (
                     <div className="min-w-full" style={{ minWidth: `${Math.max(600, dadosTendencia.length * 50)}px` }}>
                       <ResponsiveContainer width="100%" height="100%" minHeight={320}>
@@ -872,67 +884,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-            </div>
-
-            {/* Card de Estatísticas Adicionais */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <BarChart3 className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
-                  <h3 className="text-sm font-bold text-gray-800">Estatísticas</h3>
-                </div>
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Média Diária</p>
-                  <p className="text-xl sm:text-2xl font-black text-gray-900">
-                    {kpis.media.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
-                    <span className="text-xs font-medium text-gray-500 ml-1">{unidadeMedida}/dia</span>
-                  </p>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Activity className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-blue-600' : 'text-amber-600'}`} />
-                  <h3 className="text-sm font-bold text-gray-800">Registros</h3>
-                </div>
-                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-3">
-                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Total</p>
-                  <p className="text-xl sm:text-2xl font-black text-blue-700">
-                    {kpis.totalRegistros.toLocaleString('pt-BR')}
-                    <span className="text-xs font-medium text-blue-600 ml-1">leituras</span>
-                  </p>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <ArrowUpRight className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-emerald-600' : 'text-orange-600'}`} />
-                  <h3 className="text-sm font-bold text-gray-800">Maior Pico</h3>
-                </div>
-                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-3">
-                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">Consumo</p>
-                  <p className="text-xl sm:text-2xl font-black text-emerald-700">
-                    {kpis.maiorRegistro.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
-                    <span className="text-xs font-medium text-emerald-600 ml-1">{unidadeMedida}</span>
-                  </p>
-                </div>
-              </div>
-              
-              {dadosTendencia.length > 0 && (
-                <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Calendar className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-purple-600' : 'text-pink-600'}`} />
-                    <h3 className="text-sm font-bold text-gray-800">Período</h3>
-                  </div>
-                  <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-3">
-                    <p className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mb-1">Dias Ativos</p>
-                    <p className="text-xl sm:text-2xl font-black text-purple-700">
-                      {dadosTendencia.length}
-                      <span className="text-xs font-medium text-purple-600 ml-1">dias</span>
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* GRÁFICOS DE BARRAS - TOP MEDIDORES E POR ANDAR */}
