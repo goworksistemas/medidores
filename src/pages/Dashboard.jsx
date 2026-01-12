@@ -39,6 +39,53 @@ const CustomTooltip = ({ active, payload, label, tipo }) => {
   return null
 }
 
+// Tooltip customizado para Top Medidores
+const CustomTooltipTopMedidores = ({ active, payload, label, tipo }) => {
+  if (active && payload && payload.length) {
+    const unidade = tipo === 'agua' ? 'm³' : 'kWh'
+    const item = payload[0]?.payload
+    
+    return (
+      <div className="bg-white/95 backdrop-blur-sm px-4 py-3 rounded-xl shadow-xl border border-gray-200">
+        <p className="text-sm font-bold text-gray-900 mb-2">{label}</p>
+        {item && (
+          <div className="text-xs text-gray-600 space-y-1">
+            <p><span className="font-semibold">Unidade:</span> {item.unidade}</p>
+            <p><span className="font-semibold">Andar:</span> {item.andar}</p>
+          </div>
+        )}
+        <p className="text-lg font-bold mt-2" style={{ color: payload[0].color }}>
+          {Number(payload[0].value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} <span className="text-sm font-medium text-gray-400">{unidade}</span>
+        </p>
+      </div>
+    )
+  }
+  return null
+}
+
+// Tooltip customizado para Consumo por Andar
+const CustomTooltipPorAndar = ({ active, payload, label, tipo }) => {
+  if (active && payload && payload.length) {
+    const unidade = tipo === 'agua' ? 'm³' : 'kWh'
+    const item = payload[0]?.payload
+    
+    return (
+      <div className="bg-white/95 backdrop-blur-sm px-4 py-3 rounded-xl shadow-xl border border-gray-200">
+        <p className="text-sm font-bold text-gray-900 mb-2">{label}</p>
+        {item && item.unidade && (
+          <div className="text-xs text-gray-600 mb-2">
+            <p><span className="font-semibold">Unidade:</span> {item.unidade}</p>
+          </div>
+        )}
+        <p className="text-lg font-bold mt-2" style={{ color: payload[0].color }}>
+          {Number(payload[0].value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} <span className="text-sm font-medium text-gray-400">{unidade}</span>
+        </p>
+      </div>
+    )
+  }
+  return null
+}
+
 export default function Dashboard() {
   const { tipoAtivo, setTipoAtivo, dataVersion } = useTheme()
   const [loading, setLoading] = useState(true)
@@ -329,14 +376,28 @@ export default function Dashboard() {
     const agrupado = {};
     rawData.forEach(curr => {
       const andar = curr.andar || 'N/A';
-      if (!agrupado[andar]) {
-        agrupado[andar] = 0;
+      const unidade = curr.local_unidade || 'Sem unidade';
+      
+      // Chave única para agrupar por andar (pode haver andares com mesmo nome em unidades diferentes)
+      const chave = `${unidade}|${andar}`;
+      
+      if (!agrupado[chave]) {
+        agrupado[chave] = {
+          andar: andar,
+          unidade: unidade,
+          value: 0
+        };
       }
-      agrupado[andar] += curr.consumo;
+      agrupado[chave].value += curr.consumo;
     });
 
     return Object.entries(agrupado)
-      .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
+      .map(([chave, info]) => ({ 
+        name: info.andar, // Mostra apenas o nome do andar
+        andar: info.andar,
+        unidade: info.unidade,
+        value: Number(info.value.toFixed(2)) 
+      }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8); // Top 8
   }, [rawData]);
@@ -367,35 +428,16 @@ export default function Dashboard() {
     })
 
     return Object.entries(agrupado)
-      .map(([chave, info]) => {
-        // Cria label hierárquico completo: Unidade > Andar > Relógio
-        const labelHierarquico = `${info.unidade} > ${info.andar} > ${info.nomeMedidor}`
-        
-        // Label curto para o gráfico - mostra hierarquia de forma compacta
-        // Se muito longo, mostra apenas: ...Andar > Relógio
-        let labelCurto = labelHierarquico
-        if (labelHierarquico.length > 50) {
-          const partes = labelHierarquico.split(' > ')
-          if (partes.length >= 3) {
-            // Mostra: ...Andar > Relógio
-            labelCurto = `...${partes[1]} > ${partes[2]}`
-          } else if (labelHierarquico.length > 50) {
-            // Fallback: mostra últimos caracteres
-            labelCurto = '...' + labelHierarquico.substring(labelHierarquico.length - 47)
-          }
-        }
-        
-        return {
-          nome: labelCurto,
-          nomeCompleto: labelHierarquico,
-          nomeMedidor: info.nomeMedidor,
-          unidade: info.unidade,
-          andar: info.andar,
-          total: Number(info.total.toFixed(2)),
-          media: Number((info.total / info.count).toFixed(2)),
-          registros: info.count
-        }
-      })
+      .map(([chave, info]) => ({
+        nome: info.nomeMedidor, // Mostra apenas o nome do relógio
+        nomeCompleto: `${info.unidade} > ${info.andar} > ${info.nomeMedidor}`,
+        nomeMedidor: info.nomeMedidor,
+        unidade: info.unidade,
+        andar: info.andar,
+        total: Number(info.total.toFixed(2)),
+        media: Number((info.total / info.count).toFixed(2)),
+        registros: info.count
+      }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 10)
   }, [rawData])
@@ -705,7 +747,7 @@ export default function Dashboard() {
                             angle={-45}
                             textAnchor="end"
                             height={60}
-                            interval={dadosTendencia.length > 30 ? Math.floor(dadosTendencia.length / 15) : dadosTendencia.length > 15 ? 2 : 0}
+                            interval={0}
                           />
                           <YAxis 
                             axisLine={false} 
@@ -916,7 +958,7 @@ export default function Dashboard() {
                       <BarChart 
                         data={topMedidores} 
                         layout="vertical" 
-                        margin={{ top: 5, right: 50, left: 5, bottom: 5 }}
+                        margin={{ top: 5, right: 80, left: 5, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#F3F4F6" />
                         <XAxis 
@@ -929,23 +971,14 @@ export default function Dashboard() {
                         <YAxis 
                           dataKey="nome" 
                           type="category" 
-                          width={200}
+                          width={120}
                           axisLine={false} 
                           tickLine={false}
-                          tick={{fill: '#374151', fontSize: 9, fontWeight: 600}}
+                          tick={{fill: '#374151', fontSize: 10, fontWeight: 600}}
                           interval={0}
                         />
                         <Tooltip 
-                          formatter={(value, name) => [
-                            `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ${unidadeMedida}`,
-                            name === 'total' ? 'Total' : 'Média'
-                          ]}
-                          labelFormatter={(label) => {
-                            const item = topMedidores.find(d => d.nome === label)
-                            return item ? item.nomeCompleto : label
-                          }}
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', maxWidth: '300px' }}
-                          labelStyle={{ fontWeight: 'bold', marginBottom: '4px', fontSize: '11px' }}
+                          content={<CustomTooltipTopMedidores tipo={tipoAtivo} />}
                         />
                         <Bar 
                           dataKey="total" 
@@ -1007,14 +1040,14 @@ export default function Dashboard() {
                         <YAxis
                           dataKey="name"
                           type="category"
-                          width={60}
+                          width={100}
                           axisLine={false}
                           tickLine={false}
                           tick={{ fill: '#374151', fontSize: 10, fontWeight: 600 }}
                         />
                         <Tooltip
                           cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                          content={<CustomTooltip tipo={tipoAtivo} />}
+                          content={<CustomTooltipPorAndar tipo={tipoAtivo} />}
                         />
                         <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={20}>
                           {dadosPorAndar.map((entry, index) => (
