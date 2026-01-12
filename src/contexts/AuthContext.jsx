@@ -19,20 +19,27 @@ export function AuthProvider({ children }) {
     return uuidRegex.test(token) || tokenRegex.test(token)
   }
 
+  // Função auxiliar para limpar dados de autenticação QR Code
+  function limparDadosQRCode() {
+    try {
+      localStorage.removeItem('gowork_token_n1')
+      localStorage.removeItem('gowork_user_data')
+    } catch (e) {
+      console.warn('[Auth] Erro ao limpar dados QR Code:', e)
+    }
+  }
+
   // Função para validar o token QR Code salvo
+  // Retorna true se validado com sucesso, false caso contrário
   async function validarTokenN1(token) {
     console.log('[Auth] Validando token QR Code:', token.substring(0, 8) + '...')
     
     if (!validarFormatoToken(token)) {
       console.warn('[Auth] Token inválido:', token)
-      try {
-        localStorage.removeItem('gowork_token_n1')
-      } catch (e) {
-        console.warn('[Auth] Erro ao remover token:', e)
-      }
+      limparDadosQRCode()
       setUser(null)
       setLoading(false)
-      return
+      return false
     }
 
     try {
@@ -43,83 +50,79 @@ export function AuthProvider({ children }) {
         .eq('token', token.trim())
         .eq('ativo', true)
         .single()
-        .catch(err => {
-          console.error('[Auth] Erro na query do token:', err)
-          throw err
-        })
 
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout na validação do token')), 3000)
+        setTimeout(() => reject(new Error('Timeout na validação do token')), 5000) // Aumentado para 5s
       )
 
       let queryResult
       try {
         queryResult = await Promise.race([queryPromise, timeoutPromise])
       } catch (raceError) {
-        // Se for timeout ou erro de rede, trata aqui
-        if (raceError.message.includes('Timeout')) {
-          console.error('[Auth] Timeout na validação do token QR Code')
+        // Se for timeout ou erro de rede, NÃO remove o token imediatamente
+        // Pode ser problema temporário de conexão
+        console.error('[Auth] Erro na validação do token:', raceError)
+        if (raceError.message && raceError.message.includes('Timeout')) {
+          console.error('[Auth] Timeout na validação do token QR Code - mantendo token para retry')
         } else {
-          console.error('[Auth] Erro na validação do token:', raceError)
+          console.error('[Auth] Erro de rede ou query - mantendo token para retry')
         }
-        try {
-          localStorage.removeItem('gowork_token_n1')
-        } catch (e) {
-          console.warn('[Auth] Erro ao remover token:', e)
-        }
+        // Em caso de erro/timeout, mantém o token mas não autentica agora
+        // A inicialização vai usar os dados salvos
         setUser(null)
         setLoading(false)
-        return
+        return false
       }
 
-      const { data, error } = queryResult
+      const { data, error } = queryResult || { data: null, error: null }
 
       if (error) {
         if (error.code === 'PGRST116') {
-          // Token não encontrado
+          // Token não encontrado ou inativo - remove do localStorage
           console.warn('[Auth] Token não encontrado ou inativo')
         } else {
           console.error('[Auth] Erro ao buscar token:', error)
         }
-        try {
-          localStorage.removeItem('gowork_token_n1')
-        } catch (e) {
-          console.warn('[Auth] Erro ao remover token:', e)
-        }
+        limparDadosQRCode()
         setUser(null)
         setLoading(false)
-        return
+        return false
       }
 
       if (!data) {
         console.warn('[Auth] Token não retornou dados')
-        try {
-          localStorage.removeItem('gowork_token_n1')
-        } catch (e) {
-          console.warn('[Auth] Erro ao remover token:', e)
-        }
+        limparDadosQRCode()
         setUser(null)
         setLoading(false)
-        return
+        return false
       }
 
       console.log('[Auth] Token QR Code validado com sucesso:', data.descricao)
-      setUser({ 
+      const userData = { 
         id: data.id, 
         role: 'n1', 
         nome: data.descricao || 'Usuário QR Code',
         tipo: 'qr_code' 
-      })
+      }
+      
+      // Salva os dados do usuário junto com o token para persistência
+      try {
+        localStorage.setItem('gowork_user_data', JSON.stringify(userData))
+      } catch (e) {
+        console.warn('[Auth] Erro ao salvar dados do usuário:', e)
+      }
+      
+      setUser(userData)
       setLoading(false)
+      return true // Retorna true indicando sucesso
     } catch (error) {
       console.error('[Auth] Erro ao validar token:', error)
-      try {
-        localStorage.removeItem('gowork_token_n1')
-      } catch (e) {
-        console.warn('[Auth] Erro ao remover token:', e)
-      }
+      // Em caso de erro inesperado, mantém o token para retry posterior
+      // A inicialização vai usar os dados salvos se o token ainda existir
+      console.log('[Auth] Erro na validação - mantendo token para retry (usando dados salvos)')
       setUser(null)
       setLoading(false)
+      return false
     }
   }
 
@@ -184,24 +187,108 @@ export function AuthProvider({ children }) {
 
         if (tokenSalvo) {
           console.log('[Auth] Validando token QR Code...')
-          // Adiciona timeout para validação do token (reduzido para mobile)
-          const validacaoPromise = validarTokenN1(tokenSalvo)
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout na validação do token')), 2500)
-          )
           
+          // Tenta carregar dados do usuário salvos (fallback se validação falhar)
+          let userDataSalvo = null
           try {
-            await Promise.race([validacaoPromise, timeoutPromise])
-          } catch (error) {
-            console.error('[Auth] Erro ou timeout na validação do token:', error)
-            setUser(null)
-            setLoading(false)
+            const userDataStr = localStorage.getItem('gowork_user_data')
+            if (userDataStr) {
+              userDataSalvo = JSON.parse(userDataStr)
+              console.log('[Auth] Dados do usuário encontrados no localStorage')
+            }
+          } catch (e) {
+            console.warn('[Auth] Erro ao ler dados do usuário salvos:', e)
           }
+          
+          // Aumenta o timeout de segurança para dar mais tempo para validação
           if (loadingTimeoutRef.current) {
             clearTimeout(loadingTimeoutRef.current)
             loadingTimeoutRef.current = null
           }
-          return
+          // Novo timeout de 8 segundos para validação QR Code
+          loadingTimeoutRef.current = setTimeout(() => {
+            console.warn('[Auth] TIMEOUT: Usando dados salvos do usuário (validação demorou muito)')
+            // Se há dados salvos, usa eles temporariamente
+            if (userDataSalvo) {
+              console.log('[Auth] Restaurando usuário dos dados salvos:', userDataSalvo.nome)
+              setUser(userDataSalvo)
+            }
+            setLoading(false)
+          }, 8000)
+          
+          // Valida o token QR Code
+          const validado = await validarTokenN1(tokenSalvo)
+          
+          // Limpa o timeout de segurança se ainda estiver ativo
+          if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current)
+            loadingTimeoutRef.current = null
+          }
+          
+          // Se validado com sucesso, não precisa verificar sessão Supabase
+          if (validado) {
+            console.log('[Auth] Token QR Code validado - autenticação concluída')
+            return
+          }
+          
+          // Se não foi validado, verifica se o token ainda existe no localStorage
+          // (pode ter sido removido pela função validarTokenN1)
+          try {
+            const tokenAindaExiste = localStorage.getItem('gowork_token_n1')
+            if (!tokenAindaExiste) {
+              console.log('[Auth] Token removido - continuando para verificação de sessão Supabase')
+              // Remove também os dados salvos
+              limparDadosQRCode()
+              // Token foi removido, continua para verificar sessão Supabase
+            } else {
+              console.log('[Auth] Token mantido mas não validado - usando dados salvos temporariamente')
+              // Token mantido mas não validado (timeout de rede), usa dados salvos
+              // Isso permite que o usuário continue logado mesmo com problemas de conexão
+              if (userDataSalvo) {
+                console.log('[Auth] Restaurando usuário dos dados salvos (validação falhou por timeout/rede):', userDataSalvo.nome)
+                setUser(userDataSalvo)
+                setLoading(false)
+                // Tenta validar em background (não bloqueia)
+                validarTokenN1(tokenAindaExiste).then(validado => {
+                  if (validado) {
+                    console.log('[Auth] Token validado em background - dados atualizados')
+                  } else {
+                    console.warn('[Auth] Token ainda não validado em background - mantendo dados salvos')
+                  }
+                }).catch(err => {
+                  console.warn('[Auth] Erro na validação em background:', err)
+                })
+                return
+              } else {
+                console.warn('[Auth] Token mantido mas sem dados salvos - tentando validar novamente...')
+                // Tenta validar novamente com timeout menor
+                const retryValidado = await Promise.race([
+                  validarTokenN1(tokenAindaExiste),
+                  new Promise((resolve) => setTimeout(() => resolve(false), 3000))
+                ])
+                
+                if (retryValidado) {
+                  console.log('[Auth] Token QR Code validado no retry - autenticação concluída')
+                  return
+                } else {
+                  console.warn('[Auth] Token não validado mesmo após retry - sem autenticação')
+                  setUser(null)
+                  setLoading(false)
+                  return
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[Auth] Erro ao verificar token:', e)
+            // Em caso de erro, tenta usar dados salvos
+            if (userDataSalvo) {
+              console.log('[Auth] Usando dados salvos devido a erro:', userDataSalvo.nome)
+              setUser(userDataSalvo)
+              setLoading(false)
+              return
+            }
+            // Se não há dados salvos, continua para verificar sessão Supabase
+          }
         }
 
         // Verifica sessão Supabase (usa localStorage automaticamente)
@@ -327,13 +414,28 @@ export function AuthProvider({ children }) {
           return
         }
 
+        // Verifica se há token QR Code salvo ANTES de processar qualquer evento
+        let tokenQRCode = null
+        try {
+          tokenQRCode = localStorage.getItem('gowork_token_n1')
+        } catch (e) {
+          console.warn('[Auth] Erro ao verificar token QR Code:', e)
+        }
+
         // Se há token QR Code salvo, não processa eventos do Supabase Auth
-        const tokenQRCode = localStorage.getItem('gowork_token_n1')
+        // EXCETO SIGNED_OUT que deve limpar tudo
         if (tokenQRCode && event !== 'SIGNED_OUT') {
+          console.log('[Auth] Token QR Code ativo - ignorando evento Supabase Auth:', event)
           return
         }
 
         if (event === 'SIGNED_IN' && session?.user) {
+          // Só processa se não houver token QR Code
+          if (tokenQRCode) {
+            console.log('[Auth] Ignorando SIGNED_IN - token QR Code ativo')
+            return
+          }
+          
           setLoading(true)
           try {
             // Adiciona timeout para carregar perfil
@@ -374,8 +476,9 @@ export function AuthProvider({ children }) {
             setLoading(false)
           }
         } else if (event === 'SIGNED_OUT') {
-          // Limpa token QR Code também ao fazer logout
-          localStorage.removeItem('gowork_token_n1')
+          // Limpa token QR Code e dados do usuário ao fazer logout do Supabase
+          console.log('[Auth] SIGNED_OUT - limpando token QR Code e dados do usuário')
+          limparDadosQRCode()
           setUser(null)
           setLoading(false)
           processandoLoginRef.current = false
@@ -386,6 +489,8 @@ export function AuthProvider({ children }) {
             if (perfil) {
               setUser(perfil)
             }
+          } else {
+            console.log('[Auth] Ignorando TOKEN_REFRESHED - token QR Code ativo')
           }
         }
       }
@@ -470,11 +575,7 @@ export function AuthProvider({ children }) {
       processandoLoginRef.current = true
 
       // Limpa qualquer token QR Code anterior
-      try {
-        localStorage.removeItem('gowork_token_n1')
-      } catch (e) {
-        console.warn('[Auth] Erro ao remover token QR Code:', e)
-      }
+      limparDadosQRCode()
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
@@ -552,7 +653,7 @@ export function AuthProvider({ children }) {
 
       if (error) {
         processandoLoginRef.current = false
-        localStorage.removeItem('gowork_token_n1')
+        limparDadosQRCode()
         if (error.code === 'PGRST116') {
           return { success: false, message: 'QR Code não encontrado ou inativo.' }
         }
@@ -562,33 +663,49 @@ export function AuthProvider({ children }) {
 
       if (!data) {
         processandoLoginRef.current = false
-        localStorage.removeItem('gowork_token_n1')
+        limparDadosQRCode()
         return { success: false, message: 'QR Code não encontrado ou inativo.' }
       }
 
       setLoading(true)
-      setUser({ 
+      
+      // Cria objeto com dados do usuário para persistência
+      const userData = { 
         id: data.id, 
         role: 'n1', 
         nome: data.descricao || 'Usuário QR Code',
         tipo: 'qr_code' 
-      })
-      // Salva em localStorage para persistir entre sessões
+      }
+      
+      // IMPORTANTE: Salva o token E os dados do usuário ANTES de setar o usuário
+      // Isso garante que a persistência funcione mesmo se houver erro depois
       try {
         localStorage.setItem('gowork_token_n1', tokenLimpo)
-        console.log('[Auth] Token QR Code salvo no localStorage')
+        localStorage.setItem('gowork_user_data', JSON.stringify(userData))
+        console.log('[Auth] Token QR Code e dados do usuário salvos no localStorage:', tokenLimpo.substring(0, 8) + '...')
       } catch (e) {
-        console.error('[Auth] Erro ao salvar token no localStorage:', e)
-        // Continua mesmo se não conseguir salvar (pode ser problema de quota)
+        console.error('[Auth] Erro ao salvar no localStorage:', e)
+        // Se não conseguir salvar, ainda permite login mas sem persistência
+        if (e.name === 'QuotaExceededError') {
+          console.warn('[Auth] Quota do localStorage excedida - login sem persistência')
+        }
       }
+      
+      // Define o usuário após salvar o token e dados
+      setUser(userData)
+      
       // Aguarda um ciclo de renderização para garantir que o estado foi atualizado
       await new Promise(resolve => setTimeout(resolve, 200))
+      
       setLoading(false)
       processandoLoginRef.current = false
       console.log('[Auth] Login QR Code concluído com sucesso')
       return { success: true }
     } catch (error) {
       console.error('[Auth] Erro loginViaQrCode:', error)
+      // Em caso de erro após salvar o token, remove para evitar estado inconsistente
+      limparDadosQRCode()
+      setUser(null)
       setLoading(false)
       processandoLoginRef.current = false
       return { success: false, message: error.message || 'Erro inesperado ao validar QR Code.' }
@@ -598,13 +715,9 @@ export function AuthProvider({ children }) {
   async function logout() {
     try {
       console.log('[Auth] Fazendo logout...')
-      // Limpa o token da sessão ANTES de deslogar do Supabase.
+      // Limpa o token e dados do usuário ANTES de deslogar do Supabase.
       // Isso evita que o onAuthStateChange re-autentique o usuário QR Code.
-      try {
-        localStorage.removeItem('gowork_token_n1')
-      } catch (e) {
-        console.warn('[Auth] Erro ao remover token no logout:', e)
-      }
+      limparDadosQRCode()
       await supabase.auth.signOut()
       setUser(null)
       setLoading(false)
@@ -613,11 +726,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('[Auth] Erro no logout:', error)
       // Mesmo com erro, limpa o estado local
-      try {
-        localStorage.removeItem('gowork_token_n1')
-      } catch (e) {
-        console.warn('[Auth] Erro ao remover token:', e)
-      }
+      limparDadosQRCode()
       setUser(null)
       setLoading(false)
       processandoLoginRef.current = false
