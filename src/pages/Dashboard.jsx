@@ -357,7 +357,7 @@ export default function Dashboard() {
     return todosOsDias
   }, [dadosPorMes])
 
-  // Distribuição por Unidade
+  // Distribuição por Unidade - sem truncamento
   const dadosPorUnidade = useMemo(() => {
     const agrupado = {}
 
@@ -369,12 +369,11 @@ export default function Dashboard() {
 
     return Object.entries(agrupado)
       .map(([name, value]) => ({ 
-        name: name.length > 15 ? name.substring(0, 15) + '...' : name,
+        name: name, // Nome completo sem truncamento
         fullName: name,
         value: Number(value.toFixed(2)) 
       }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 8) // Top 8 para não poluir
   }, [rawData])
 
   // Distribuição por Andar (NOVO GRÁFICO)
@@ -799,10 +798,10 @@ export default function Dashboard() {
                       <BarChart3 className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
                     </div>
                     <div>
-                      <h3 className="text-base sm:text-lg font-bold text-gray-800">Evolução do Consumo</h3>
+                      <h3 className="text-base sm:text-lg font-bold text-gray-800">Evolução do Consumo Diário</h3>
                       <p className="text-xs text-gray-400">
                         {dadosTendencia.length > 0 
-                          ? `${dadosTendencia.length} dias com registro • ${dadosPorMes.length} ${dadosPorMes.length === 1 ? 'mês' : 'meses'}`
+                          ? `Consumo por dia • ${dadosTendencia.length} ${dadosTendencia.length === 1 ? 'dia registrado' : 'dias registrados'} • Role horizontalmente para ver todos`
                           : 'Carregando dados...'}
                       </p>
                     </div>
@@ -890,7 +889,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <h3 className="text-base sm:text-lg font-bold text-gray-800">Top 10 Maiores Consumidores</h3>
-                      <p className="text-xs text-gray-400">Consumo total acumulado no período</p>
+                      <p className="text-xs text-gray-400">Medidores com maior consumo total no período selecionado</p>
                     </div>
                   </div>
                 </div>
@@ -914,7 +913,7 @@ export default function Dashboard() {
                         <YAxis 
                           dataKey="nome" 
                           type="category" 
-                          width={120}
+                          width={150}
                           axisLine={false} 
                           tickLine={false}
                           tick={{fill: '#374151', fontSize: 10, fontWeight: 600}}
@@ -1101,19 +1100,22 @@ export default function Dashboard() {
             {/* GRÁFICOS DE BARRAS VERTICAIS POR UNIDADE - CONSUMO POR ANDAR */}
             {dadosPorAndarPorUnidade.length > 0 && (
               <div className="w-full">
-                <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                  <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                    <BarChart3 className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
-                  </div>
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-gray-800">Consumo por Andar - Por Unidade</h3>
-                    <p className="text-xs text-gray-400">{dadosPorAndarPorUnidade.length} unidades</p>
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
+                      <BarChart3 className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-bold text-gray-800">Consumo por Andar - Por Unidade</h3>
+                      <p className="text-xs text-gray-400">{dadosPorAndarPorUnidade.length} unidades • Role horizontalmente para ver todas</p>
+                    </div>
                   </div>
                 </div>
                 
-                {/* Grid de gráficos - melhorado para unidades com muitos andares */}
-                <div className="grid grid-cols-1 gap-6 xl:gap-8">
-                  {dadosPorAndarPorUnidade.map((unidadeData, unidadeIndex) => {
+                {/* Carrossel horizontal de gráficos */}
+                <div className="w-full overflow-x-auto pb-2">
+                  <div className="flex gap-6" style={{ minWidth: 'max-content' }}>
+                    {dadosPorAndarPorUnidade.map((unidadeData, unidadeIndex) => {
                     const totalUnidade = unidadeData.dados.reduce((sum, item) => sum + item.value, 0);
                     const alturaGrafico = unidadeData.dados.length > 8 ? 'h-[400px]' : 'h-80';
                     const barSize = unidadeData.dados.length > 10 ? 25 : unidadeData.dados.length > 6 ? 35 : 45;
@@ -1125,16 +1127,19 @@ export default function Dashboard() {
                     return (
                       <div 
                         key={unidadeIndex} 
-                        className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-5 sm:p-6 lg:p-8"
+                        className="flex-shrink-0 bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-5 sm:p-6"
+                        style={{ width: '600px' }}
                       >
                         {/* Header do gráfico da unidade */}
-                        <div className="flex items-center justify-between mb-5 sm:mb-6">
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                              <Building className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                        <div className="mb-4 sm:mb-5">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`p-2 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
+                              <Building className={`w-4 h-4 sm:w-5 sm:h-5 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
                             </div>
-                            <div>
-                              <h4 className="text-base sm:text-lg font-bold text-gray-800">{unidadeData.unidade}</h4>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm sm:text-base font-bold text-gray-800 truncate" title={unidadeData.unidade}>
+                                {unidadeData.unidade}
+                              </h4>
                               <p className="text-xs text-gray-500">
                                 {unidadeData.dados.length} {unidadeData.dados.length === 1 ? 'andar' : 'andares'} • 
                                 Total: {totalUnidade.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} {unidadeMedida}
@@ -1146,7 +1151,7 @@ export default function Dashboard() {
                         {/* Gráfico de barras verticais */}
                         {unidadeData.dados.length > 0 ? (
                           <div className="w-full overflow-x-auto">
-                            <div className={`${alturaGrafico}`} style={{ minWidth: `${Math.max(800, unidadeData.dados.length * 100)}px`, width: '100%' }}>
+                            <div className={`${alturaGrafico}`} style={{ minWidth: `${Math.max(500, unidadeData.dados.length * 80)}px`, width: '100%' }}>
                               <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
                                   data={unidadeData.dados}
@@ -1232,6 +1237,7 @@ export default function Dashboard() {
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               </div>
             )}
