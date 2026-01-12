@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useTheme } from '../contexts/ThemeContext'
 import { supabase } from '../supabaseClient'
@@ -8,21 +8,18 @@ import {
 } from 'recharts'
 import { 
   Zap, Droplets, TrendingUp, History, 
-  Calendar, MapPin, AlertCircle, ArrowUpRight, Filter, Building, Layers, X, ChevronDown, Activity, BarChart3
+  Calendar, MapPin, AlertCircle, ArrowUpRight, Filter, Building, Layers, X, ChevronDown, Activity, BarChart3, ChevronLeft, ChevronRight
 } from 'lucide-react'
 
 // Cores do Tema - Paleta profissional
 const COLORS_WATER = ['#0EA5E9', '#38BDF8', '#7DD3FC', '#BAE6FD', '#0284C7', '#0369A1']
 const COLORS_ENERGY = ['#F59E0B', '#FBBF24', '#FCD34D', '#FDE68A', '#D97706', '#B45309']
 
-// Opções de período predefinido
+// Opções de período predefinido (máximo 30 dias)
 const PERIODOS_OPCOES = [
   { value: 7, label: 'Últimos 7 dias' },
   { value: 15, label: 'Últimos 15 dias' },
   { value: 30, label: 'Últimos 30 dias' },
-  { value: 60, label: 'Últimos 60 dias' },
-  { value: 90, label: 'Últimos 90 dias' },
-  { value: 365, label: 'Último ano' },
   { value: 0, label: 'Personalizado' },
 ]
 
@@ -55,18 +52,27 @@ export default function Dashboard() {
   const [filtroAndar, setFiltroAndar] = useState('')
   const [showFilters, setShowFilters] = useState(true)
   
+  // Controle de navegação mensal
+  const [mesAtualIndex, setMesAtualIndex] = useState(0)
+  
   // Opções dinâmicas
   const [opcoesUnidades, setOpcoesUnidades] = useState([])
   const [opcoesAndares, setOpcoesAndares] = useState([])
 
-  // Calcula datas baseado no período
+  // Calcula datas baseado no período (períodos predefinidos limitados a 30 dias)
   const { dataCorteStr, dataFimStr } = useMemo(() => {
+    const hoje = new Date()
+    
     if (periodo === 0 && dataInicio && dataFim) {
+      // Período personalizado - sem limite
       return { dataCorteStr: dataInicio, dataFimStr: dataFim }
     }
-    const hoje = new Date()
+    
+    // Limita período predefinido a máximo 30 dias
+    const periodoLimitado = Math.min(periodo || 30, 30)
     const dataCorte = new Date()
-    dataCorte.setDate(dataCorte.getDate() - (periodo || 30))
+    dataCorte.setDate(dataCorte.getDate() - periodoLimitado)
+    
     return { 
       dataCorteStr: dataCorte.toISOString().split('T')[0],
       dataFimStr: hoje.toISOString().split('T')[0]
@@ -225,9 +231,9 @@ export default function Dashboard() {
     return { total, media, maiorRegistro, totalRegistros }
   }, [rawData, diasPeriodo])
 
-  // Dados de Tendência Diária
-  const dadosTendencia = useMemo(() => {
-    const agrupado = {}
+  // Agrupa dados por mês e cria lista de meses disponíveis
+  const { dadosPorMes, mesesDisponiveis } = useMemo(() => {
+    const agrupadoPorMes = {}
     
     rawData.forEach(curr => {
       let dataStr = curr.dataRegistro
@@ -245,23 +251,80 @@ export default function Dashboard() {
       
       if (isNaN(dataObj.getTime())) return
       
-      const chave = dataObj.toISOString().split('T')[0]
-      if (!agrupado[chave]) {
-        agrupado[chave] = { total: 0, count: 0 }
+      // Cria chave no formato YYYY-MM para agrupar por mês
+      const anoMes = `${dataObj.getFullYear()}-${String(dataObj.getMonth() + 1).padStart(2, '0')}`
+      const dia = dataObj.toISOString().split('T')[0]
+      
+      if (!agrupadoPorMes[anoMes]) {
+        agrupadoPorMes[anoMes] = {}
       }
-      agrupado[chave].total += curr.consumo
-      agrupado[chave].count += 1
+      
+      if (!agrupadoPorMes[anoMes][dia]) {
+        agrupadoPorMes[anoMes][dia] = { total: 0, count: 0 }
+      }
+      
+      agrupadoPorMes[anoMes][dia].total += curr.consumo
+      agrupadoPorMes[anoMes][dia].count += 1
     })
     
-    return Object.entries(agrupado)
-      .map(([data, info]) => ({
-        data,
-        dataFormatada: new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
-        consumo: Number(info.total.toFixed(2)),
-        registros: info.count
-      }))
-      .sort((a, b) => a.data.localeCompare(b.data))
+    // Cria lista de meses ordenados
+    const meses = Object.keys(agrupadoPorMes).sort()
+    
+    // Processa dados de cada mês
+    const dadosProcessados = meses.map(anoMes => {
+      const diasDoMes = Object.entries(agrupadoPorMes[anoMes])
+        .map(([data, info]) => ({
+          data,
+          dataFormatada: new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+          consumo: Number(info.total.toFixed(2)),
+          registros: info.count
+        }))
+        .sort((a, b) => a.data.localeCompare(b.data))
+      
+      return {
+        anoMes,
+        label: new Date(anoMes + '-01').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+        dias: diasDoMes
+      }
+    })
+    
+    return {
+      dadosPorMes: dadosProcessados,
+      mesesDisponiveis: meses
+    }
   }, [rawData])
+
+  // Dados do mês atual para exibição
+  const dadosTendencia = useMemo(() => {
+    if (dadosPorMes.length === 0) return []
+    
+    // Garante que o índice está dentro dos limites
+    const indexValido = Math.max(0, Math.min(mesAtualIndex, dadosPorMes.length - 1))
+    const mesSelecionado = dadosPorMes[indexValido]
+    
+    return mesSelecionado ? mesSelecionado.dias : []
+  }, [dadosPorMes, mesAtualIndex])
+
+  // Reset do índice quando os dados mudam
+  useEffect(() => {
+    if (dadosPorMes.length > 0) {
+      if (mesAtualIndex >= dadosPorMes.length) {
+        setMesAtualIndex(dadosPorMes.length - 1)
+      }
+    }
+  }, [dadosPorMes.length, mesAtualIndex])
+
+  // Reset para o mês mais recente quando tipo ou período muda
+  const prevTipoAtivo = useRef(tipoAtivo)
+  const prevPeriodo = useRef(periodo)
+  useEffect(() => {
+    if (dadosPorMes.length > 0 && 
+        (prevTipoAtivo.current !== tipoAtivo || prevPeriodo.current !== periodo)) {
+      setMesAtualIndex(dadosPorMes.length - 1)
+      prevTipoAtivo.current = tipoAtivo
+      prevPeriodo.current = periodo
+    }
+  }, [tipoAtivo, periodo, dadosPorMes.length])
 
   // Distribuição por Unidade
   const dadosPorUnidade = useMemo(() => {
@@ -404,13 +467,24 @@ export default function Dashboard() {
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Período</label>
                   <select
                     value={periodo}
-                    onChange={(e) => setPeriodo(Number(e.target.value))}
+                    onChange={(e) => {
+                      const novoPeriodo = Number(e.target.value)
+                      setPeriodo(novoPeriodo)
+                      // Limpa datas personalizadas quando seleciona período predefinido
+                      if (novoPeriodo !== 0) {
+                        setDataInicio('')
+                        setDataFim('')
+                      }
+                    }}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 text-sm font-medium transition-all"
                   >
                     {PERIODOS_OPCOES.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
+                  {periodo !== 0 && (
+                    <p className="text-[10px] text-gray-400 mt-1">Máximo: 30 dias</p>
+                  )}
                 </div>
 
                 {periodo === 0 && (
@@ -421,6 +495,7 @@ export default function Dashboard() {
                         type="date"
                         value={dataInicio}
                         onChange={(e) => setDataInicio(e.target.value)}
+                        max={dataFim || undefined}
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 text-sm font-medium transition-all"
                       />
                     </div>
@@ -430,6 +505,7 @@ export default function Dashboard() {
                         type="date"
                         value={dataFim}
                         onChange={(e) => setDataFim(e.target.value)}
+                        min={dataInicio || undefined}
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 text-sm font-medium transition-all"
                       />
                     </div>
@@ -586,95 +662,122 @@ export default function Dashboard() {
             {/* GRÁFICOS */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 xl:gap-8">
               
-              {/* Gráfico de Tendência */}
+              {/* Gráfico de Barras - Evolução Mensal */}
               <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <div className="flex items-center gap-3">
                     <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                      <TrendingUp className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                      <BarChart3 className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
                     </div>
                     <div>
                       <h3 className="text-base sm:text-lg font-bold text-gray-800">Evolução do Consumo</h3>
-                      <p className="text-xs text-gray-400">{dadosTendencia.length} dias com registro</p>
+                      <p className="text-xs text-gray-400">
+                        {dadosPorMes.length > 0 && dadosPorMes[mesAtualIndex] 
+                          ? `${dadosPorMes[mesAtualIndex].label} • ${dadosTendencia.length} dias com registro`
+                          : 'Carregando dados...'}
+                      </p>
                     </div>
                   </div>
+                  
+                  {/* Controles de Navegação */}
+                  {dadosPorMes.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setMesAtualIndex(prev => Math.max(0, prev - 1))}
+                        disabled={mesAtualIndex === 0}
+                        className={`p-2 rounded-lg transition-all ${
+                          mesAtualIndex === 0
+                            ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95'
+                        }`}
+                        title="Mês anterior"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <span className="text-xs font-medium text-gray-600 px-2">
+                        {mesAtualIndex + 1} / {dadosPorMes.length}
+                      </span>
+                      <button
+                        onClick={() => setMesAtualIndex(prev => Math.min(dadosPorMes.length - 1, prev + 1))}
+                        disabled={mesAtualIndex === dadosPorMes.length - 1}
+                        className={`p-2 rounded-lg transition-all ${
+                          mesAtualIndex === dadosPorMes.length - 1
+                            ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95'
+                        }`}
+                        title="Próximo mês"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 
-                <div className="h-64 sm:h-80 w-full">
+                <div className="h-64 sm:h-80 w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400" style={{ scrollbarWidth: 'thin' }}>
                   {dadosTendencia.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={dadosTendencia} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="colorGradientArea" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={themeColor} stopOpacity={0.4}/>
-                            <stop offset="100%" stopColor={themeColor} stopOpacity={0.05}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                        <XAxis 
-                          dataKey="dataFormatada" 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{fill: '#9CA3AF', fontSize: 10, fontWeight: 500}} 
-                          dy={10}
-                          interval="preserveStartEnd"
-                          angle={-45}
-                          textAnchor="end"
-                          height={60}
-                        />
-                        <YAxis 
-                          axisLine={false} 
-                          tickLine={false} 
-                          tick={{fill: '#9CA3AF', fontSize: 10, fontWeight: 500}}
-                          tickFormatter={(v) => v.toLocaleString('pt-BR')}
-                          width={50}
-                        />
-                        <Tooltip content={<CustomTooltip tipo={tipoAtivo} />} />
-                        <Area 
-                          type="monotone" 
-                          dataKey="consumo" 
-                          stroke={themeColor} 
-                          strokeWidth={3}
-                          fillOpacity={1} 
-                          fill="url(#colorGradientArea)" 
-                          activeDot={{ 
-                            r: 8, 
-                            strokeWidth: 3, 
-                            stroke: '#fff', 
-                            fill: themeColor,
-                            label: { 
-                              fill: '#374151', 
-                              fontSize: '11px', 
-                              fontWeight: 'bold',
-                              formatter: (v) => `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ${unidadeMedida}`
-                            }
-                          }}
-                        >
-                          <LabelList 
-                            dataKey="consumo" 
-                            position="top" 
-                            formatter={(v, entry, index) => {
-                              // Mostra rótulo apenas em pontos específicos para não poluir
-                              const total = dadosTendencia.length
-                              if (total <= 7) return `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}`
-                              // Para mais de 7 pontos, mostra apenas no primeiro, último e pontos intermediários
-                              if (index === 0 || index === total - 1 || index === Math.floor(total / 2)) {
-                                return `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}`
-                              }
-                              return ''
-                            }}
-                            style={{ fill: '#374151', fontSize: '9px', fontWeight: 'bold' }}
-                            offset={10}
+                    <div className="min-w-full" style={{ minWidth: `${Math.max(600, dadosTendencia.length * 50)}px` }}>
+                      <ResponsiveContainer width="100%" height="100%" minHeight={320}>
+                        <BarChart data={dadosTendencia} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                          <XAxis 
+                            dataKey="dataFormatada" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{fill: '#9CA3AF', fontSize: 10, fontWeight: 500}} 
+                            angle={-45}
+                            textAnchor="end"
+                            height={60}
+                            interval={dadosTendencia.length > 15 ? 2 : 0}
                           />
-                        </Area>
-                      </AreaChart>
-                    </ResponsiveContainer>
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{fill: '#9CA3AF', fontSize: 10, fontWeight: 500}}
+                            tickFormatter={(v) => v.toLocaleString('pt-BR')}
+                            width={50}
+                          />
+                          <Tooltip content={<CustomTooltip tipo={tipoAtivo} />} />
+                          <Bar 
+                            dataKey="consumo" 
+                            fill={themeColor}
+                            radius={[8, 8, 0, 0]}
+                            barSize={dadosTendencia.length > 15 ? 30 : 40}
+                          >
+                            {dadosTendencia.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={themeColor}
+                                opacity={0.9}
+                              />
+                            ))}
+                            <LabelList 
+                              dataKey="consumo" 
+                              position="top" 
+                              formatter={(v) => v > 0 ? `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}` : ''}
+                              style={{ fill: '#374151', fontSize: '9px', fontWeight: 'bold' }}
+                              offset={5}
+                            />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   ) : (
                     <div className="h-full flex items-center justify-center text-gray-400">
                       <p className="text-sm">Sem dados suficientes para o gráfico</p>
                     </div>
                   )}
                 </div>
+                
+                {/* Indicador de scroll */}
+                {dadosTendencia.length > 12 && (
+                  <div className="mt-2 text-center">
+                    <p className="text-xs text-gray-400 flex items-center justify-center gap-2">
+                      <span>←</span>
+                      <span>Role horizontalmente para ver todos os dias</span>
+                      <span>→</span>
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Gráfico de Barras - Por Unidade */}
