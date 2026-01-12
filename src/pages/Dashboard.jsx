@@ -787,110 +787,102 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-6">
             
-            {/* GRÁFICOS */}
-            <div className="grid grid-cols-1 gap-6 xl:gap-8">
-              
-              {/* Gráfico de Barras - Evolução Mensal */}
-              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-4 sm:mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                      <BarChart3 className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
-                    </div>
-                    <div>
-                      <h3 className="text-base sm:text-lg font-bold text-gray-800">Evolução do Consumo Diário</h3>
-                      <p className="text-xs text-gray-400">
-                        {dadosTendencia.length > 0 
-                          ? `Consumo por dia • ${dadosTendencia.length} ${dadosTendencia.length === 1 ? 'dia registrado' : 'dias registrados'} • Role horizontalmente para ver todos`
-                          : 'Carregando dados...'}
-                      </p>
-                    </div>
+            {/* SEÇÃO 1: GRÁFICO PRINCIPAL - EVOLUÇÃO TEMPORAL */}
+            <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-5 sm:p-6 lg:p-8">
+              <div className="flex items-center justify-between mb-5 sm:mb-6">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-xl ${tipoAtivo === 'agua' ? 'bg-gradient-to-br from-sky-100 to-blue-100' : 'bg-gradient-to-br from-amber-100 to-orange-100'}`}>
+                    <TrendingUp className={`w-6 h-6 sm:w-7 sm:h-7 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900">Evolução do Consumo Diário</h3>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                      {dadosTendencia.length > 0 
+                        ? `${dadosTendencia.length} ${dadosTendencia.length === 1 ? 'dia registrado' : 'dias registrados'} • Role horizontalmente para ver todos`
+                        : 'Carregando dados...'}
+                    </p>
                   </div>
                 </div>
-                
-                <div className="h-64 sm:h-80 w-full overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400" style={{ scrollbarWidth: 'thin' }}>
-                  {dadosTendencia.length > 0 ? (
-                    <div className="min-w-full" style={{ minWidth: `${Math.max(600, dadosTendencia.length * 50)}px` }}>
-                      <ResponsiveContainer width="100%" height="100%" minHeight={320}>
-                        <BarChart data={dadosTendencia} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                          <XAxis 
-                            dataKey="dataFormatada" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{fill: '#9CA3AF', fontSize: 10, fontWeight: 500}} 
-                            angle={-45}
-                            textAnchor="end"
-                            height={60}
-                            interval={0}
-                          />
-                          <YAxis 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{fill: '#9CA3AF', fontSize: 10, fontWeight: 500}}
-                            tickFormatter={(v) => v.toLocaleString('pt-BR')}
-                            width={50}
-                          />
-                          <Tooltip content={<CustomTooltip tipo={tipoAtivo} />} />
-                          <Bar 
-                            dataKey="consumo" 
-                            fill={themeColor}
-                            radius={[8, 8, 0, 0]}
-                            barSize={dadosTendencia.length > 15 ? 30 : 40}
-                          >
-                            {dadosTendencia.map((entry, index) => (
-                              <Cell 
-                                key={`cell-${index}`} 
-                                fill={themeColor}
-                                opacity={0.9}
-                              />
-                            ))}
-                            <LabelList 
-                              dataKey="consumo" 
-                              position="top" 
-                              formatter={(v) => v > 0 ? `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}` : ''}
-                              style={{ fill: '#374151', fontSize: '9px', fontWeight: 'bold' }}
-                              offset={5}
+              </div>
+              
+              <div className="h-72 sm:h-96 lg:h-[420px] w-full overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400" style={{ scrollbarWidth: 'thin' }}>
+                {dadosTendencia.length > 0 ? (
+                  <div className="min-w-full" style={{ minWidth: `${Math.max(600, dadosTendencia.length * 50)}px` }}>
+                    <ResponsiveContainer width="100%" height="100%" minHeight={320}>
+                      <BarChart data={dadosTendencia} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                        <XAxis 
+                          dataKey="dataFormatada" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#6B7280', fontSize: 11, fontWeight: 600}} 
+                          angle={-45}
+                          textAnchor="end"
+                          height={70}
+                          interval={0}
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#6B7280', fontSize: 11, fontWeight: 600}}
+                          tickFormatter={(v) => v.toLocaleString('pt-BR')}
+                          width={60}
+                        />
+                        <Tooltip content={<CustomTooltip tipo={tipoAtivo} />} />
+                        <Bar 
+                          dataKey="consumo" 
+                          fill={themeColor}
+                          radius={[8, 8, 0, 0]}
+                          barSize={dadosTendencia.length > 15 ? 35 : 45}
+                        >
+                          {dadosTendencia.map((entry, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={themeColor}
+                              opacity={0.85}
                             />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-gray-400">
-                      <p className="text-sm">Sem dados suficientes para o gráfico</p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Indicador de scroll */}
-                {dadosTendencia.length > 12 && (
-                  <div className="mt-2 text-center">
-                    <p className="text-xs text-gray-400 flex items-center justify-center gap-2">
-                      <span>←</span>
-                      <span>Role horizontalmente para ver todos os dias</span>
-                      <span>→</span>
-                    </p>
+                          ))}
+                          <LabelList 
+                            dataKey="consumo" 
+                            position="top" 
+                            formatter={(v) => v > 0 ? `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}` : ''}
+                            style={{ fill: '#374151', fontSize: '10px', fontWeight: 'bold' }}
+                            offset={8}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-400">
+                    <p className="text-sm">Sem dados suficientes para o gráfico</p>
                   </div>
                 )}
               </div>
-
+              
+              {dadosTendencia.length > 12 && (
+                <div className="mt-3 text-center">
+                  <p className="text-xs text-gray-400 flex items-center justify-center gap-2">
+                    <span className="text-lg">←</span>
+                    <span>Role horizontalmente para ver todos os dias</span>
+                    <span className="text-lg">→</span>
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* GRÁFICOS DE BARRAS - TOP MEDIDORES E POR UNIDADE */}
+            {/* SEÇÃO 2: DISTRIBUIÇÕES - GRID RESPONSIVO */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 xl:gap-8">
               
-              {/* TOP MEDIDORES - Gráfico de Barras */}
-              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-4 sm:mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                      <AlertCircle className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
-                    </div>
-                    <div>
-                      <h3 className="text-base sm:text-lg font-bold text-gray-800">Top 10 Maiores Consumidores</h3>
-                      <p className="text-xs text-gray-400">Medidores com maior consumo total no período selecionado</p>
-                    </div>
+              {/* Top Medidores */}
+              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5 sm:mb-6">
+                  <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
+                    <AlertCircle className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900">Top 10 Maiores Consumidores</h3>
+                    <p className="text-xs text-gray-500">Medidores com maior consumo no período</p>
                   </div>
                 </div>
                 
@@ -900,20 +892,20 @@ export default function Dashboard() {
                       <BarChart 
                         data={topMedidores} 
                         layout="vertical" 
-                        margin={{ top: 5, right: 80, left: 5, bottom: 5 }}
+                        margin={{ top: 5, right: 90, left: 5, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#F3F4F6" />
                         <XAxis 
                           type="number" 
                           axisLine={false} 
                           tickLine={false}
-                          tick={{fill: '#9CA3AF', fontSize: 10, fontWeight: 500}}
+                          tick={{fill: '#6B7280', fontSize: 10, fontWeight: 600}}
                           tickFormatter={(v) => v.toLocaleString('pt-BR')}
                         />
                         <YAxis 
                           dataKey="nome" 
                           type="category" 
-                          width={150}
+                          width={140}
                           axisLine={false} 
                           tickLine={false}
                           tick={{fill: '#374151', fontSize: 10, fontWeight: 600}}
@@ -926,13 +918,13 @@ export default function Dashboard() {
                           dataKey="total" 
                           fill={themeColor}
                           radius={[0, 8, 8, 0]}
-                          barSize={22}
+                          barSize={24}
                         >
                           {topMedidores.map((entry, index) => (
                             <Cell 
                               key={`cell-${index}`} 
                               fill={index === 0 ? themeColorDark : themeColor}
-                              opacity={1 - (index * 0.06)}
+                              opacity={index === 0 ? 1 : 1 - (index * 0.05)}
                             />
                           ))}
                           <LabelList 
@@ -952,15 +944,15 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Gráfico de Barras - Por Unidade */}
-              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-4 sm:mb-6">
+              {/* Por Unidade */}
+              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5 sm:mb-6">
                   <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
                     <Building className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
                   </div>
                   <div>
-                    <h3 className="text-base sm:text-lg font-bold text-gray-800">Por Unidade</h3>
-                    <p className="text-xs text-gray-400">{dadosPorUnidade.length} unidades</p>
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900">Consumo por Unidade</h3>
+                    <p className="text-xs text-gray-500">{dadosPorUnidade.length} unidades cadastradas</p>
                   </div>
                 </div>
                 
@@ -970,20 +962,20 @@ export default function Dashboard() {
                       <BarChart
                         data={dadosPorUnidade}
                         layout="vertical"
-                        margin={{ top: 5, right: 40, left: 10, bottom: 5 }}
+                        margin={{ top: 5, right: 50, left: 10, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#F3F4F6" />
                         <XAxis 
                           type="number" 
                           axisLine={false} 
                           tickLine={false}
-                          tick={{fill: '#9CA3AF', fontSize: 10, fontWeight: 500}}
+                          tick={{fill: '#6B7280', fontSize: 10, fontWeight: 600}}
                           tickFormatter={(v) => v.toLocaleString('pt-BR')}
                         />
                         <YAxis 
                           dataKey="name" 
                           type="category" 
-                          width={80}
+                          width={100}
                           axisLine={false} 
                           tickLine={false}
                           tick={{fill: '#374151', fontSize: 10, fontWeight: 600}}
@@ -999,7 +991,7 @@ export default function Dashboard() {
                         <Bar 
                           dataKey="value" 
                           radius={[0, 8, 8, 0]} 
-                          barSize={20}
+                          barSize={22}
                         >
                           {dadosPorUnidade.map((entry, index) => (
                             <Cell 
@@ -1026,218 +1018,217 @@ export default function Dashboard() {
 
             </div>
 
-            {/* Tabela complementar */}
+            {/* SEÇÃO 3: TABELA DETALHADA TOP MEDIDORES */}
             {topMedidores.length > 0 && (
-              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-4 sm:p-6">
-                <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-100 overflow-x-auto">
-                  <div className="min-w-full">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr>
-                          <th className="pb-2 sm:pb-3 px-2 sm:px-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">#</th>
-                          <th className="pb-2 sm:pb-3 px-2 sm:px-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">Hierarquia</th>
-                          <th className="pb-2 sm:pb-3 px-2 sm:px-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Unidade</th>
-                          <th className="pb-2 sm:pb-3 px-2 sm:px-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider hidden md:table-cell">Andar</th>
-                          <th className="pb-2 sm:pb-3 px-2 sm:px-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Relógio</th>
-                          <th className="pb-2 sm:pb-3 px-2 sm:px-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider text-right hidden xl:table-cell">Registros</th>
-                          <th className="pb-2 sm:pb-3 px-2 sm:px-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider text-right hidden lg:table-cell">Média</th>
-                          <th className="pb-2 sm:pb-3 px-2 sm:px-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {topMedidores.slice(0, 5).map((item, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
-                            <td className="py-2 sm:py-3 px-2 sm:px-4">
-                              <span className={`inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full text-[10px] sm:text-xs font-bold ${
-                                idx === 0 ? 'bg-amber-100 text-amber-700' :
-                                idx === 1 ? 'bg-gray-200 text-gray-600' :
-                                idx === 2 ? 'bg-orange-100 text-orange-700' :
-                                'bg-gray-100 text-gray-500'
-                              }`}>
-                                {idx + 1}
-                              </span>
-                            </td>
-                            <td className="py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm" title={item.nomeCompleto}>
-                              <div className="flex flex-col">
-                                <span className="text-[10px] text-gray-400">{item.unidade}</span>
-                                <span className="text-[10px] text-gray-500">{item.andar}</span>
-                                <span className="font-bold">{item.nomeMedidor}</span>
-                              </div>
-                            </td>
-                            <td className="py-2 sm:py-3 px-2 sm:px-4 hidden sm:table-cell">
-                              <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-blue-50 text-blue-700 rounded-lg text-[10px] sm:text-xs font-semibold">
-                                {item.unidade || 'Sem unidade'}
-                              </span>
-                            </td>
-                            <td className="py-2 sm:py-3 px-2 sm:px-4 hidden md:table-cell">
-                              <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-purple-50 text-purple-700 rounded-lg text-[10px] sm:text-xs font-semibold">
-                                {item.andar || 'Sem andar'}
-                              </span>
-                            </td>
-                            <td className="py-2 sm:py-3 px-2 sm:px-4 hidden lg:table-cell">
-                              <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-gray-100 text-gray-700 rounded-lg text-[10px] sm:text-xs font-semibold">
-                                {item.nomeMedidor}
-                              </span>
-                            </td>
-                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm text-gray-500 font-medium hidden xl:table-cell">
-                              {item.registros}
-                            </td>
-                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm text-gray-500 font-medium hidden lg:table-cell">
-                              {item.media.toLocaleString('pt-BR')} {unidadeMedida}
-                            </td>
-                            <td className={`py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm font-bold ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`}>
-                              {item.total.toLocaleString('pt-BR')} {unidadeMedida}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
+                    <BarChart3 className={`w-5 h-5 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
                   </div>
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900">Detalhamento dos Maiores Consumidores</h3>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b-2 border-gray-200">
+                        <th className="pb-3 px-3 sm:px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
+                        <th className="pb-3 px-3 sm:px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Hierarquia</th>
+                        <th className="pb-3 px-3 sm:px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Unidade</th>
+                        <th className="pb-3 px-3 sm:px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">Andar</th>
+                        <th className="pb-3 px-3 sm:px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Relógio</th>
+                        <th className="pb-3 px-3 sm:px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right hidden xl:table-cell">Registros</th>
+                        <th className="pb-3 px-3 sm:px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right hidden lg:table-cell">Média</th>
+                        <th className="pb-3 px-3 sm:px-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {topMedidores.slice(0, 10).map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-3 px-3 sm:px-4">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-xs font-bold ${
+                              idx === 0 ? 'bg-amber-100 text-amber-700' :
+                              idx === 1 ? 'bg-gray-200 text-gray-600' :
+                              idx === 2 ? 'bg-orange-100 text-orange-700' :
+                              'bg-gray-100 text-gray-500'
+                            }`}>
+                              {idx + 1}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 sm:px-4 font-semibold text-gray-700 text-sm" title={item.nomeCompleto}>
+                            <div className="flex flex-col">
+                              <span className="text-xs text-gray-400">{item.unidade}</span>
+                              <span className="text-xs text-gray-500">{item.andar}</span>
+                              <span className="font-bold text-gray-900">{item.nomeMedidor}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 sm:px-4 hidden sm:table-cell">
+                            <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold">
+                              {item.unidade || 'Sem unidade'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 sm:px-4 hidden md:table-cell">
+                            <span className="px-2.5 py-1 bg-purple-50 text-purple-700 rounded-lg text-xs font-semibold">
+                              {item.andar || 'Sem andar'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 sm:px-4 hidden lg:table-cell">
+                            <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold">
+                              {item.nomeMedidor}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 sm:px-4 text-right text-sm text-gray-600 font-medium hidden xl:table-cell">
+                            {item.registros}
+                          </td>
+                          <td className="py-3 px-3 sm:px-4 text-right text-sm text-gray-600 font-medium hidden lg:table-cell">
+                            {item.media.toLocaleString('pt-BR')} {unidadeMedida}
+                          </td>
+                          <td className={`py-3 px-3 sm:px-4 text-right text-sm font-bold ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`}>
+                            {item.total.toLocaleString('pt-BR')} {unidadeMedida}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
 
-            {/* GRÁFICOS DE BARRAS VERTICAIS POR UNIDADE - CONSUMO POR ANDAR */}
+            {/* SEÇÃO 4: CONSUMO POR ANDAR - GRID AO INVÉS DE CARROSSEL */}
             {dadosPorAndarPorUnidade.length > 0 && (
-              <div className="w-full">
-                <div className="flex items-center justify-between mb-4 sm:mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                      <BarChart3 className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
-                    </div>
-                    <div>
-                      <h3 className="text-base sm:text-lg font-bold text-gray-800">Consumo por Andar - Por Unidade</h3>
-                      <p className="text-xs text-gray-400">{dadosPorAndarPorUnidade.length} unidades • Role horizontalmente para ver todas</p>
-                    </div>
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
+                    <Layers className={`w-5 h-5 sm:w-6 sm:h-6 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-gray-900">Consumo por Andar</h3>
+                    <p className="text-xs text-gray-500">{dadosPorAndarPorUnidade.length} unidades • Detalhamento por andar</p>
                   </div>
                 </div>
                 
-                {/* Carrossel horizontal de gráficos */}
-                <div className="w-full overflow-x-auto pb-2">
-                  <div className="flex gap-6" style={{ minWidth: 'max-content' }}>
-                    {dadosPorAndarPorUnidade.map((unidadeData, unidadeIndex) => {
+                {/* Grid responsivo de gráficos por unidade */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {dadosPorAndarPorUnidade.map((unidadeData, unidadeIndex) => {
                     const totalUnidade = unidadeData.dados.reduce((sum, item) => sum + item.value, 0);
-                    const alturaGrafico = unidadeData.dados.length > 8 ? 'h-[400px]' : 'h-80';
-                    const barSize = unidadeData.dados.length > 10 ? 25 : unidadeData.dados.length > 6 ? 35 : 45;
-                    const marginBottom = unidadeData.dados.length > 6 ? 80 : 60;
+                    const alturaGrafico = unidadeData.dados.length > 8 ? 'h-[380px]' : 'h-[320px]';
+                    const barSize = unidadeData.dados.length > 10 ? 28 : unidadeData.dados.length > 6 ? 38 : 48;
+                    const marginBottom = unidadeData.dados.length > 6 ? 70 : 50;
                     const fontSizeXAxis = unidadeData.dados.length > 8 ? 9 : 10;
-                    const fontSizeLabel = unidadeData.dados.length > 8 ? '12px' : '13px';
+                    const fontSizeLabel = unidadeData.dados.length > 8 ? '11px' : '12px';
                     const angleXAxis = unidadeData.dados.length > 6 ? -45 : -30;
                     
                     return (
                       <div 
                         key={unidadeIndex} 
-                        className="flex-shrink-0 bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-5 sm:p-6"
-                        style={{ width: '600px' }}
+                        className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 p-5 sm:p-6"
                       >
                         {/* Header do gráfico da unidade */}
-                        <div className="mb-4 sm:mb-5">
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-2 rounded-xl ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
-                              <Building className={`w-4 h-4 sm:w-5 sm:h-5 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
+                        <div className="mb-4">
+                          <div className="flex items-center gap-2.5 mb-2">
+                            <div className={`p-2 rounded-lg ${tipoAtivo === 'agua' ? 'bg-sky-100' : 'bg-amber-100'}`}>
+                              <Building className={`w-4 h-4 ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="text-sm sm:text-base font-bold text-gray-800 truncate" title={unidadeData.unidade}>
+                              <h4 className="text-sm font-bold text-gray-900 truncate" title={unidadeData.unidade}>
                                 {unidadeData.unidade}
                               </h4>
                               <p className="text-xs text-gray-500">
-                                {unidadeData.dados.length} {unidadeData.dados.length === 1 ? 'andar' : 'andares'} • 
-                                Total: {totalUnidade.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} {unidadeMedida}
+                                {unidadeData.dados.length} {unidadeData.dados.length === 1 ? 'andar' : 'andares'}
                               </p>
                             </div>
+                          </div>
+                          <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg px-3 py-2">
+                            <p className="text-xs text-gray-600 font-semibold">
+                              Total: <span className={`font-bold ${tipoAtivo === 'agua' ? 'text-sky-600' : 'text-amber-600'}`}>
+                                {totalUnidade.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} {unidadeMedida}
+                              </span>
+                            </p>
                           </div>
                         </div>
                         
                         {/* Gráfico de barras verticais */}
                         {unidadeData.dados.length > 0 ? (
                           <div className="w-full overflow-x-auto">
-                            <div className={`${alturaGrafico}`} style={{ minWidth: `${Math.max(500, unidadeData.dados.length * 80)}px`, width: '100%' }}>
+                            <div className={`${alturaGrafico}`} style={{ minWidth: `${Math.max(400, unidadeData.dados.length * 70)}px`, width: '100%' }}>
                               <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
                                   data={unidadeData.dados}
-                                  margin={{ top: 20, right: 15, left: 10, bottom: marginBottom }}
+                                  margin={{ top: 15, right: 10, left: 5, bottom: marginBottom }}
                                 >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                                <XAxis 
-                                  dataKey="name"
-                                  axisLine={false}
-                                  tickLine={false}
-                                  tick={{fill: '#9CA3AF', fontSize: fontSizeXAxis, fontWeight: 500}}
-                                  angle={angleXAxis}
-                                  textAnchor="end"
-                                  height={marginBottom}
-                                  interval={0}
-                                />
-                                <YAxis 
-                                  type="number"
-                                  axisLine={false}
-                                  tickLine={false}
-                                  tick={{fill: '#9CA3AF', fontSize: 10, fontWeight: 500}}
-                                  tickFormatter={(v) => v.toLocaleString('pt-BR')}
-                                  width={60}
-                                />
-                                <Tooltip
-                                  cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                                  content={<CustomTooltipPorAndar tipo={tipoAtivo} />}
-                                />
-                                <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={barSize}>
-                                  {unidadeData.dados.map((entry, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={pieColors[index % pieColors.length]}
-                                    />
-                                  ))}
-                                  <LabelList 
-                                    dataKey="value" 
-                                    position="top" 
-                                    content={((barWidth) => (props) => {
-                                      const { x, y, value, width, payload, index } = props
-                                      if (!value || value === 0) return null
-                                      const formattedValue = `${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} ${unidadeMedida}`
-                                      // No Recharts, para barras verticais com position="top",
-                                      // o x representa a posição horizontal da barra
-                                      // Precisamos calcular o centro considerando a largura real
-                                      // Tenta usar width das props primeiro (mais preciso)
-                                      let centerX = x
-                                      if (width && width > 0) {
-                                        // Se width está disponível, x é o início, então adiciona metade
-                                        centerX = x + width / 2
-                                      } else {
-                                        // Se não, usa barSize como aproximação
-                                        centerX = x + barWidth / 2
-                                      }
-                                      // Offset vertical para posicionar acima da barra
-                                      const offsetY = -10
-                                      return (
-                                        <g transform={`translate(${centerX},${y + offsetY})`}>
-                                          <text
-                                            x={0}
-                                            y={0}
-                                            textAnchor="middle"
-                                            fill="#374151"
-                                            fontSize={fontSizeLabel}
-                                            fontWeight="bold"
-                                          >
-                                            {formattedValue}
-                                          </text>
-                                        </g>
-                                      )
-                                    })(barSize)}
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                                  <XAxis 
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{fill: '#6B7280', fontSize: fontSizeXAxis, fontWeight: 500}}
+                                    angle={angleXAxis}
+                                    textAnchor="end"
+                                    height={marginBottom}
+                                    interval={0}
                                   />
-                                </Bar>
-                              </BarChart>
-                            </ResponsiveContainer>
+                                  <YAxis 
+                                    type="number"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{fill: '#6B7280', fontSize: 9, fontWeight: 500}}
+                                    tickFormatter={(v) => v.toLocaleString('pt-BR')}
+                                    width={50}
+                                  />
+                                  <Tooltip
+                                    cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                                    content={<CustomTooltipPorAndar tipo={tipoAtivo} />}
+                                  />
+                                  <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={barSize}>
+                                    {unidadeData.dados.map((entry, index) => (
+                                      <Cell
+                                        key={`cell-${index}`}
+                                        fill={pieColors[index % pieColors.length]}
+                                      />
+                                    ))}
+                                    <LabelList 
+                                      dataKey="value" 
+                                      position="top" 
+                                      content={((barWidth) => (props) => {
+                                        const { x, y, value, width } = props
+                                        if (!value || value === 0) return null
+                                        const formattedValue = `${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}`
+                                        let centerX = x
+                                        if (width && width > 0) {
+                                          centerX = x + width / 2
+                                        } else {
+                                          centerX = x + barWidth / 2
+                                        }
+                                        const offsetY = -8
+                                        return (
+                                          <g transform={`translate(${centerX},${y + offsetY})`}>
+                                            <text
+                                              x={0}
+                                              y={0}
+                                              textAnchor="middle"
+                                              fill="#374151"
+                                              fontSize={fontSizeLabel}
+                                              fontWeight="bold"
+                                            >
+                                              {formattedValue}
+                                            </text>
+                                          </g>
+                                        )
+                                      })(barSize)}
+                                    />
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
                             </div>
                           </div>
                         ) : (
-                          <div className="h-96 flex items-center justify-center text-gray-400">
-                            <p className="text-sm">Sem dados de andares para esta unidade</p>
+                          <div className="h-80 flex items-center justify-center text-gray-400">
+                            <p className="text-xs">Sem dados de andares</p>
                           </div>
                         )}
                       </div>
                     );
                   })}
-                  </div>
                 </div>
               </div>
             )}
