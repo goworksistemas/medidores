@@ -110,19 +110,8 @@ export default function Historico() {
         let consumo = null
         if (leituraAnterior && leituraAnterior.medidor_id === leituraAtual.medidor_id) {
           const diferenca = leituraAtual.leitura - leituraAnterior.leitura
-          
-          if (diferenca < 0) {
-            // Diferença negativa pode ser "virada" ou erro de digitação
-            if (leituraAtual.observacao?.includes('ROLLOVER_CONFIRMADO')) {
-              // É uma virada de relógio confirmada, o consumo é a leitura atual.
-              consumo = leituraAtual.leitura
-            } else {
-              // Se não for confirmada, trata como possível erro de digitação.
-              consumo = null
-            }
-          } else {
-            consumo = diferenca
-          }
+          // Sempre mostra a diferença, mesmo que seja negativa (indica virada do relógio)
+          consumo = diferenca
         }
         
         leiturasComConsumo.push({ ...leituraAtual, consumo })
@@ -378,8 +367,20 @@ export default function Historico() {
                         <td className="p-4 text-right">
                           {item.consumo !== null && item.consumo !== undefined ? (
                             <>
-                              <span className="font-mono font-semibold text-blue-600">{formatNum(item.consumo)}</span>
-                                <span className="text-[10px] text-blue-400 ml-1">{unidadeMedida}</span>
+                              <span className={`font-mono font-semibold ${
+                                item.consumo < 0 
+                                  ? 'text-red-600' 
+                                  : 'text-blue-600'
+                              }`}>
+                                {formatNum(item.consumo)}
+                              </span>
+                              <span className={`text-[10px] ml-1 ${
+                                item.consumo < 0 
+                                  ? 'text-red-400' 
+                                  : 'text-blue-400'
+                              }`}>
+                                {unidadeMedida}
+                              </span>
                             </>
                           ) : (
                             <span className="text-gray-400 text-xs">N/A</span>
