@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Scanner } from '@yudiel/react-qr-scanner'
-import { Zap, QrCode, X, Mail, Lock, UserPlus } from 'lucide-react'
+import { QrCode, X, Mail, Lock, UserPlus, Check } from 'lucide-react'
 import MixedAnimation from '../components/MixedAnimation'
+import LogoBranco from '../assets/Logotipo sistemas_BRANCO.svg'
 
 export default function Login() {
   const { user, criarConta, loginComEmailSenha, loginViaQrCode } = useAuth()
@@ -207,10 +208,12 @@ export default function Login() {
         
         {/* Header Visual */}
         <div className="bg-gradient-to-r from-blue-600 to-cyan-500 p-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4 backdrop-blur-sm">
-            <Zap className="w-8 h-8 text-white" fill="currentColor" />
+          <div className="flex flex-col items-center justify-center mb-4">
+            <img src={LogoBranco} alt="MeasureGo Logo" className="w-24 h-24 object-contain mb-2" />
+            <h1 className="text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-cyan-100 to-white bg-clip-text text-transparent drop-shadow-lg">
+              MeasureGo
+            </h1>
           </div>
-          <h1 className="text-2xl font-bold text-white">GOWORK</h1>
           <p className="text-blue-100 text-sm mt-1">Gestão de Utilidades</p>
         </div>
 
@@ -319,7 +322,7 @@ export default function Login() {
 
               {sucesso && (
                 <div className="p-3 bg-green-50 text-green-600 text-sm rounded-xl flex items-center justify-center gap-2 border border-green-100">
-                  <Zap className="w-4 h-4" /> {sucesso}
+                  <Check className="w-4 h-4" /> {sucesso}
                 </div>
               )}
 

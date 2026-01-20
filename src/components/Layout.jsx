@@ -6,6 +6,8 @@ import { LogOut } from 'lucide-react'
 import BottomMenu from './BottomMenu'
 import ChuvaAnimation from './ChuvaAnimation'
 import RaiosAnimation from './RaiosAnimation'
+import LogoBranco from '../assets/Logotipo sistemas_BRANCO.svg'
+import LogoPreto from '../assets/Logotipo sistemas_PRETO.svg'
 
 export default function Layout() {
   const { tipoAtivo } = useTheme()
@@ -144,17 +146,22 @@ export default function Layout() {
         {tipoAtivo === 'agua' ? memoizedChuva : memoizedRaios}
         
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center justify-between relative z-10">
-          <div>
-            <h1 className={`text-2xl sm:text-3xl font-bold tracking-wide transition-colors ${
-              tipoAtivo === 'agua' ? 'text-white' : 'text-yellow-700'
-            }`}>
-              GOWORK
-            </h1>
-            <p className={`text-xs sm:text-sm uppercase tracking-wider mt-1 transition-colors ${
-              tipoAtivo === 'agua' ? 'text-white opacity-90' : 'text-yellow-800 opacity-90'
-            }`}>
-              {user?.nome || 'Gestão de Utilidades'}
-            </p>
+          <div className="flex items-center gap-1.5">
+            <img src={tipoAtivo === 'agua' ? LogoBranco : LogoPreto} alt="MeasureGo Logo" className="w-20 h-16 sm:w-18 sm:h-18 object-contain" />
+            <div>
+              <h1 className={`text-2xl sm:text-3xl font-black tracking-tighter transition-all ${
+                tipoAtivo === 'agua' 
+                  ? 'bg-gradient-to-r from-white via-cyan-100 to-white bg-clip-text text-transparent drop-shadow-lg' 
+                  : 'bg-gradient-to-r from-gray-900 via-black to-gray-900 bg-clip-text text-transparent drop-shadow-2xl'
+              }`}>
+                MeasureGo
+              </h1>
+              <p className={`text-xs sm:text-sm uppercase tracking-wider mt-1 transition-colors ${
+                tipoAtivo === 'agua' ? 'text-white opacity-90' : 'text-yellow-800 opacity-90'
+              }`}>
+                {user?.nome || 'Gestão de Utilidades'}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
