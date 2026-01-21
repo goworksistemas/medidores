@@ -14,7 +14,7 @@ export default function OpcaoEntrada() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center pt-8 sm:pt-12 p-4">
       <div className="text-center mb-8 sm:mb-12">
         <div className="flex justify-center mb-2">
-          <img src={Logo} alt="MeasureGo Logo" className="w-60 h-60 object-contain" />
+          <img src={Logo} alt="MensureGo Logo" className="w-60 h-60 object-contain" />
         </div>
         <h2 className="text-4xl font-bold text-gray-800 mb-2">Iniciar Leitura</h2>
         <p className="text-lg text-gray-600">Como você prefere identificar o medidor?</p>

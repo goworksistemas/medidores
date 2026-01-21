@@ -209,9 +209,9 @@ export default function Login() {
         {/* Header Visual */}
         <div className="bg-gradient-to-r from-blue-600 to-cyan-500 p-8 text-center">
           <div className="flex flex-col items-center justify-center mb-4">
-            <img src={LogoBranco} alt="MeasureGo Logo" className="w-24 h-24 object-contain mb-2" />
+            <img src={LogoBranco} alt="MensureGo Logo" className="w-24 h-24 object-contain mb-2" />
             <h1 className="text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-cyan-100 to-white bg-clip-text text-transparent drop-shadow-lg">
-              MeasureGo
+              MensureGo
             </h1>
           </div>
           <p className="text-blue-100 text-sm mt-1">Gestão de Utilidades</p>
