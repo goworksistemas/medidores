@@ -549,7 +549,8 @@ export function AuthProvider({ children }) {
           email: email.trim().toLowerCase(),
           role: 'user',
           access_medicoes: true,   // Acesso liberado por padrão
-          access_dp_rh: false      // Sem acesso ao RH por padrão
+          access_dp_rh: false,     // Sem acesso ao RH por padrão
+          allowed_tabs: []         // Sem abas liberadas no RH por padrão
         }, { onConflict: 'id' })
 
       if (profileError) {
