@@ -19,8 +19,8 @@ export default function GerenciarUsuarios() {
   const [loadingToken, setLoadingToken] = useState(false)
   const [tokenCopiado, setTokenCopiado] = useState(false)
 
-  // Verifica se o usuário tem permissão (admin ou role específica)
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+  // Verifica se o usuário tem permissão (apenas Admin Master pode gerenciar usuários)
+  const isAdminMaster = user?.role === 'super_admin'
 
   const roleDisplayMap = {
     user: 'Operacional',
@@ -30,12 +30,12 @@ export default function GerenciarUsuarios() {
   }
 
   useEffect(() => {
-    if (!isAdmin) {
-      setMensagem({ tipo: 'erro', texto: 'Você não tem permissão para acessar esta página.' })
+    if (!isAdminMaster) {
+      setMensagem({ tipo: 'erro', texto: 'Apenas Admin Master pode acessar esta página.' })
       return
     }
     fetchUsuarios()
-  }, [isAdmin])
+  }, [isAdminMaster])
 
   async function fetchUsuarios() {
     setLoading(true)
@@ -269,13 +269,13 @@ export default function GerenciarUsuarios() {
     )
   })
 
-  if (!isAdmin) {
+  if (!isAdminMaster) {
     return (
       <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-lg border border-red-200 p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Acesso Negado</h2>
-          <p className="text-gray-600">Você não tem permissão para acessar esta página.</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Acesso Restrito</h2>
+          <p className="text-gray-600">Apenas <strong>Admin Master</strong> pode gerenciar usuários.</p>
         </div>
       </div>
     )
