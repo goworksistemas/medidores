@@ -6,8 +6,11 @@ export default function BottomMenu() {
   const location = useLocation()
   const { user } = useAuth()
   
-  // Verifica se o usuário é admin
+  // Verifica se o usuário é admin (pode ver Medidores)
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+  
+  // Verifica se o usuário é Admin Master (único que pode gerenciar usuários)
+  const isAdminMaster = user?.role === 'super_admin'
   
   // Função para destacar o ícone ativo
   const isActive = (path) => {
@@ -35,17 +38,20 @@ export default function BottomMenu() {
           <span className="text-[11px] font-semibold tracking-tight">Gráficos</span>
         </Link>
 
+        {/* Medidores - visível para Admin e Admin Master */}
         {isAdmin && (
-          <>
-            <Link to="/medidores" className={`flex flex-col items-center gap-1 transition-all duration-300 ${isActive('/medidores')}`}>
-              <Gauge className="w-7 h-7" />
-              <span className="text-[11px] font-semibold tracking-tight">Medidores</span>
-            </Link>
-            <Link to="/usuarios" className={`flex flex-col items-center gap-1 transition-all duration-300 ${isActive('/usuarios')}`}>
-              <Users className="w-7 h-7" />
-              <span className="text-[11px] font-semibold tracking-tight">Usuários</span>
-            </Link>
-          </>
+          <Link to="/medidores" className={`flex flex-col items-center gap-1 transition-all duration-300 ${isActive('/medidores')}`}>
+            <Gauge className="w-7 h-7" />
+            <span className="text-[11px] font-semibold tracking-tight">Medidores</span>
+          </Link>
+        )}
+        
+        {/* Usuários - visível APENAS para Admin Master */}
+        {isAdminMaster && (
+          <Link to="/usuarios" className={`flex flex-col items-center gap-1 transition-all duration-300 ${isActive('/usuarios')}`}>
+            <Users className="w-7 h-7" />
+            <span className="text-[11px] font-semibold tracking-tight">Usuários</span>
+          </Link>
         )}
 
       </div>
