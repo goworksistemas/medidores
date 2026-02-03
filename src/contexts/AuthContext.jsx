@@ -539,8 +539,8 @@ export function AuthProvider({ children }) {
         return { success: false, message: 'Erro ao criar conta. Tente novamente.' }
       }
 
-      // Cria profile com acesso NEGADO por padrão
-      // O admin deve liberar o acesso manualmente depois
+      // Cria profile com acesso LIBERADO ao sistema de Medições por padrão
+      // O admin pode depois ajustar os acessos (Medições e/ou RH)
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
@@ -548,8 +548,8 @@ export function AuthProvider({ children }) {
           name: nome.trim(),
           email: email.trim().toLowerCase(),
           role: 'user',
-          access_medicoes: false,  // Sem acesso por padrão
-          access_dp_rh: false      // Sem acesso por padrão
+          access_medicoes: true,   // Acesso liberado por padrão
+          access_dp_rh: false      // Sem acesso ao RH por padrão
         }, { onConflict: 'id' })
 
       if (profileError) {
@@ -557,7 +557,7 @@ export function AuthProvider({ children }) {
         // Não falha a criação da conta se o profile falhar, mas loga o erro
       }
 
-      return { success: true, message: 'Conta criada! Aguarde liberação de acesso pelo administrador.' }
+      return { success: true, message: 'Conta criada com sucesso! Você já pode acessar o sistema.' }
     } catch (error) {
       console.error('[Auth] Erro criarConta:', error)
       return { success: false, message: error.message || 'Erro inesperado ao criar conta.' }

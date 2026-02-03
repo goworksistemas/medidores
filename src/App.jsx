@@ -13,7 +13,6 @@ import Login from './pages/login'
 import OpcaoEntrada from './pages/OpcaoEntrada'
 import GerenciarUsuarios from './pages/GerenciarUsuarios'
 import GerenciarMedidores from './pages/GerenciarMedidores'
-import AguardandoAprovacao from './pages/AguardandoAprovacao'
 
 // Componente para proteger rotas
 function RotaPrivada({ children }) {
@@ -90,14 +89,9 @@ function RotaPrivada({ children }) {
   }
   
   logger.debug('App', 'Usuário autenticado:', user.tipo, user.nome)
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin'
-  const isQrCode = user.tipo === 'qr_code'
-  const temAcessoMedicoes = user.access_medicoes === true
   
-  if (!isAdmin && !isQrCode && !temAcessoMedicoes) {
-    return <Navigate to="/aguardando-aprovacao" replace />
-  }
-
+  // Usuário autenticado pode acessar o sistema
+  // O controle de acesso (Medições/RH) é feito pela tela de Gerenciar Usuários
   return children
 }
 
@@ -109,7 +103,6 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/aguardando-aprovacao" element={<AguardandoAprovacao />} />
               
               <Route path="/" element={
                 <RotaPrivada>
