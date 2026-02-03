@@ -117,9 +117,9 @@ export default function Layout() {
 
   const roleDisplayMap = {
     user: 'Operacional',
-    n1: 'Operacional',
+    n1: 'N1',
     admin: 'Admin',
-    super_admin: 'Master',
+    super_admin: 'Admin Master',
   }
 
   // Memoizamos as animações para que não sejam recriadas a cada navegação,

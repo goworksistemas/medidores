@@ -13,6 +13,7 @@ import Login from './pages/login'
 import OpcaoEntrada from './pages/OpcaoEntrada'
 import GerenciarUsuarios from './pages/GerenciarUsuarios'
 import GerenciarMedidores from './pages/GerenciarMedidores'
+import AcessoNegado from './pages/AcessoNegado'
 
 // Componente para proteger rotas
 function RotaPrivada({ children }) {
@@ -90,9 +91,28 @@ function RotaPrivada({ children }) {
   
   logger.debug('App', 'Usuário autenticado:', user.tipo, user.nome)
   
-  // Usuário autenticado pode acessar o sistema
-  // O controle de acesso (Medições/RH) é feito pela tela de Gerenciar Usuários
-  return children
+  // Verifica se o usuário tem acesso ao Sistema de Medições
+  // Roles do Sistema de Medições:
+  // - super_admin (Admin Master - devs)
+  // - admin (Admin)
+  // - user (Operacional) - precisa ter access_medicoes = true
+  // - n1 (QR Code) - sempre tem acesso
+  
+  const isAdminMaster = user.role === 'super_admin'
+  const isAdmin = user.role === 'admin'
+  const isQrCode = user.tipo === 'qr_code'
+  const temAcessoMedicoes = user.access_medicoes === true
+  
+  // Admin Master e Admin sempre têm acesso
+  // QR Code sempre tem acesso (login via crachá)
+  // Operacional (user) precisa ter access_medicoes = true
+  if (isAdminMaster || isAdmin || isQrCode || temAcessoMedicoes) {
+    return children
+  }
+  
+  // Sem acesso - redireciona para página de acesso negado
+  logger.warn('App', 'Usuário sem acesso ao sistema de Medições:', user.nome)
+  return <Navigate to="/acesso-negado" replace />
 }
 
 function App() {
@@ -103,6 +123,7 @@ function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/acesso-negado" element={<AcessoNegado />} />
               
               <Route path="/" element={
                 <RotaPrivada>

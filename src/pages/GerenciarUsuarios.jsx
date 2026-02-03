@@ -24,8 +24,9 @@ export default function GerenciarUsuarios() {
 
   const roleDisplayMap = {
     user: 'Operacional',
+    n1: 'N1',
     admin: 'Admin',
-    super_admin: 'Master',
+    super_admin: 'Admin Master',
   }
 
   useEffect(() => {
@@ -383,7 +384,7 @@ export default function GerenciarUsuarios() {
                             >
                               <option value="user">Operacional</option>
                               <option value="admin">Admin</option>
-                              <option value="super_admin">Master</option>
+                              <option value="super_admin">Admin Master</option>
                             </select>
                           </td>
                           <td className="p-4 text-center">
