@@ -3,7 +3,8 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
 import { 
   Users, Search, Edit2, Save, X, Shield, ShieldCheck, ShieldX,
-  Mail, User, AlertCircle, CheckCircle2, Loader2, Eye, QrCode, Copy, Check
+  Mail, User, AlertCircle, CheckCircle2, Loader2, Eye, QrCode, Copy, Check,
+  Trash2, UserX
 } from 'lucide-react'
 
 export default function GerenciarUsuarios() {
@@ -18,6 +19,8 @@ export default function GerenciarUsuarios() {
   const [tokenUsuario, setTokenUsuario] = useState(null)
   const [loadingToken, setLoadingToken] = useState(false)
   const [tokenCopiado, setTokenCopiado] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   // Verifica se o usuário tem permissão (apenas Admin Master pode gerenciar usuários)
   const isAdminMaster = user?.role === 'super_admin'
@@ -260,6 +263,75 @@ export default function GerenciarUsuarios() {
     }
   }
 
+  // Função para excluir usuário
+  async function handleDeleteUser(usuarioId) {
+    // Não permite excluir a si mesmo
+    if (usuarioId === user?.id) {
+      setMensagem({ tipo: 'erro', texto: 'Você não pode excluir sua própria conta!' })
+      setTimeout(() => setMensagem(null), 3000)
+      return
+    }
+
+    setDeletingId(usuarioId)
+    
+    try {
+      // 1. Primeiro, tenta desativar/excluir tokens de acesso do usuário
+      const usuarioParaExcluir = usuarios.find(u => u.id === usuarioId)
+      if (usuarioParaExcluir?.name) {
+        await supabase
+          .from('tokens_acesso')
+          .update({ ativo: false })
+          .eq('descricao', usuarioParaExcluir.name)
+      }
+      if (usuarioParaExcluir?.email) {
+        await supabase
+          .from('tokens_acesso')
+          .update({ ativo: false })
+          .eq('descricao', usuarioParaExcluir.email)
+      }
+
+      // 2. Exclui da tabela profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', usuarioId)
+
+      if (profileError) {
+        throw profileError
+      }
+
+      // 3. Tenta excluir do auth.users via função RPC (se existir)
+      const { error: authError } = await supabase.rpc('delete_user_by_id', { user_id: usuarioId })
+      
+      if (authError) {
+        // Se a função RPC não existir, apenas avisa que precisa excluir manualmente
+        if (authError.code === 'PGRST202' || authError.message?.includes('function') || authError.message?.includes('does not exist')) {
+          console.warn('Função RPC não encontrada. Usuário removido da tabela profiles, mas ainda existe no auth.users.')
+          setMensagem({ 
+            tipo: 'sucesso', 
+            texto: `Usuário removido do sistema! Para exclusão completa do Auth, acesse o Supabase Dashboard.` 
+          })
+        } else {
+          throw authError
+        }
+      } else {
+        setMensagem({ tipo: 'sucesso', texto: 'Usuário excluído completamente com sucesso!' })
+      }
+
+      // Atualiza a lista local
+      setUsuarios(currentUsers => currentUsers.filter(u => u.id !== usuarioId))
+      setConfirmDelete(null)
+      
+      setTimeout(() => setMensagem(null), 5000)
+    } catch (error) {
+      console.error('Erro ao excluir usuário:', error)
+      setMensagem({ tipo: 'erro', texto: `Erro ao excluir usuário: ${error.message || 'Erro desconhecido'}` })
+      setTimeout(() => setMensagem(null), 5000)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const usuariosFiltrados = usuarios.filter(u => {
     const termo = searchTerm.toLowerCase()
     return (
@@ -494,6 +566,21 @@ export default function GerenciarUsuarios() {
                               >
                                 <Edit2 className="w-5 h-5" />
                               </button>
+                              {/* Não mostra botão de excluir para o próprio usuário ou outros Admin Master */}
+                              {usuario.id !== user?.id && usuario.role !== 'super_admin' && (
+                                <button
+                                  onClick={() => setConfirmDelete(usuario)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Excluir usuário"
+                                  disabled={deletingId === usuario.id}
+                                >
+                                  {deletingId === usuario.id ? (
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-5 h-5" />
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </td>
                         </>
@@ -527,6 +614,75 @@ export default function GerenciarUsuarios() {
             </div>
           </div>
         </div>
+
+        {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
+        {confirmDelete && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setConfirmDelete(null)}>
+            <div 
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                    <UserX className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Excluir Usuário</h2>
+                    <p className="text-sm text-red-100">Esta ação não pode ser desfeita</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <p className="text-red-900 font-semibold mb-2">
+                    Tem certeza que deseja excluir este usuário?
+                  </p>
+                  <div className="bg-white rounded-lg p-3 border border-red-100">
+                    <p className="font-bold text-gray-900">{confirmDelete.name || 'Sem nome'}</p>
+                    <p className="text-sm text-gray-500">{confirmDelete.email}</p>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                  <p className="text-sm text-yellow-800">
+                    <strong>⚠️ Atenção:</strong> O usuário será removido da tabela de perfis. 
+                    Para exclusão completa do sistema de autenticação, pode ser necessário 
+                    acessar o Supabase Dashboard.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 border-t border-gray-200 p-4 flex gap-3 justify-end">
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+                  disabled={deletingId}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => handleDeleteUser(confirmDelete.id)}
+                  disabled={deletingId}
+                  className="px-6 py-2 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {deletingId ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Excluindo...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Excluir Usuário
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* MODAL DE VISUALIZAÇÃO DO USUÁRIO E QR CODE */}
         {usuarioSelecionado && (
