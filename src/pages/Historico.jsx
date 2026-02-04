@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../supabaseClient'
 import { 
   Calendar, Droplets, Zap, Trash2, X, Search, Filter, Edit2, Save,
@@ -13,6 +14,10 @@ const VALOR_SEM_ANDAR = '___SEM_ANDAR___'
 
 export default function Historico() {
   const { tipoAtivo, setTipoAtivo, refreshData } = useTheme()
+  const { user } = useAuth()
+  
+  // Verifica se o usuário é Admin Master (único que pode editar/excluir)
+  const isAdminMaster = user?.role === 'super_admin'
   
   // Estados de Dados
   const [leituras, setLeituras] = useState([])
@@ -435,12 +440,16 @@ export default function Historico() {
                                   <MessageSquare className="w-5 h-5" />
                                 </button>
                               )}
-                              <button onClick={() => handleEdit(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                                <Edit2 className="w-5 h-5" />
-                              </button>
-                              <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
-                                <Trash2 className="w-5 h-5" />
-                              </button>
+                              {isAdminMaster && (
+                                <>
+                                  <button onClick={() => handleEdit(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                    <Edit2 className="w-5 h-5" />
+                                  </button>
+                                  <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
+                                    <Trash2 className="w-5 h-5" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           )}
                         </td>
