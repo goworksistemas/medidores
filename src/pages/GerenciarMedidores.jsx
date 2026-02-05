@@ -267,6 +267,8 @@ export default function GerenciarMedidores() {
   const [showFilters, setShowFilters] = useState(true)
   const [exportando, setExportando] = useState(false)
   const [confirmNovaUnidade, setConfirmNovaUnidade] = useState(null) // Modal para confirmar nova unidade
+  const [modoNovaUnidade, setModoNovaUnidade] = useState(false) // Controla se está cadastrando nova unidade
+  const [novaUnidadeNome, setNovaUnidadeNome] = useState('') // Nome da nova unidade
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState('')
@@ -338,6 +340,8 @@ export default function GerenciarMedidores() {
   function handleCancelAdd() {
     setShowAddForm(false)
     setEditForm({})
+    setModoNovaUnidade(false)
+    setNovaUnidadeNome('')
   }
 
   // Gera um token único para o medidor
@@ -381,13 +385,6 @@ export default function GerenciarMedidores() {
     }
   }
 
-  // Verifica se a unidade (prédio) já existe
-  function verificarUnidadeExiste(localUnidade) {
-    if (!localUnidade || localUnidade.trim() === '') return true // Campo vazio, pode continuar
-    const unidadesExistentes = [...new Set(medidores.map(m => m.local_unidade?.toLowerCase()).filter(Boolean))]
-    return unidadesExistentes.includes(localUnidade.toLowerCase().trim())
-  }
-
   // Função para adicionar medidor (chamada após confirmação)
   async function adicionarMedidor() {
     try {
@@ -412,6 +409,8 @@ export default function GerenciarMedidores() {
       setShowAddForm(false)
       setEditForm({})
       setConfirmNovaUnidade(null)
+      setModoNovaUnidade(false)
+      setNovaUnidadeNome('')
       fetchMedidores()
       
       setTimeout(() => setMensagem(null), 3000)
@@ -422,12 +421,12 @@ export default function GerenciarMedidores() {
     }
   }
 
-  // Função principal de adicionar - verifica se unidade existe
+  // Função principal de adicionar - verifica se está criando nova unidade
   async function handleAdd() {
     const localUnidade = editForm.local_unidade?.trim()
     
-    // Se tem unidade preenchida e ela não existe, pergunta se quer criar
-    if (localUnidade && !verificarUnidadeExiste(localUnidade)) {
+    // Se está no modo nova unidade, mostra confirmação
+    if (modoNovaUnidade && localUnidade) {
       setConfirmNovaUnidade({
         unidade: localUnidade,
         medidor: editForm.nome
@@ -435,7 +434,7 @@ export default function GerenciarMedidores() {
       return
     }
     
-    // Se a unidade existe ou está vazia, adiciona direto
+    // Se selecionou uma unidade existente, adiciona direto
     await adicionarMedidor()
   }
 
@@ -938,13 +937,59 @@ export default function GerenciarMedidores() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Prédio/Local *</label>
-                <input
-                  type="text"
-                  value={editForm.local_unidade}
-                  onChange={(e) => setEditForm({ ...editForm, local_unidade: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: Prédio A"
-                />
+                {!modoNovaUnidade ? (
+                  <select
+                    value={editForm.local_unidade}
+                    onChange={(e) => {
+                      if (e.target.value === '__NOVA__') {
+                        setModoNovaUnidade(true)
+                        setNovaUnidadeNome('')
+                        setEditForm({ ...editForm, local_unidade: '' })
+                      } else {
+                        setEditForm({ ...editForm, local_unidade: e.target.value })
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Selecione uma unidade...</option>
+                    {filterOptions.predios.map(predio => (
+                      <option key={predio} value={predio}>{predio}</option>
+                    ))}
+                    <option value="__NOVA__" className="text-blue-600 font-semibold">➕ Cadastrar nova unidade...</option>
+                  </select>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={novaUnidadeNome}
+                        onChange={(e) => {
+                          setNovaUnidadeNome(e.target.value)
+                          setEditForm({ ...editForm, local_unidade: e.target.value })
+                        }}
+                        className="flex-1 px-4 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-50"
+                        placeholder="Digite o nome da nova unidade"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModoNovaUnidade(false)
+                          setNovaUnidadeNome('')
+                          setEditForm({ ...editForm, local_unidade: '' })
+                        }}
+                        className="px-3 py-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition-colors"
+                        title="Cancelar nova unidade"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-600 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Uma nova unidade será criada ao salvar o medidor
+                    </p>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Andar</label>
@@ -960,7 +1005,7 @@ export default function GerenciarMedidores() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleAdd}
-                disabled={!editForm.nome || !editForm.tipo}
+                disabled={!editForm.nome || !editForm.tipo || !editForm.local_unidade}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Salvar
