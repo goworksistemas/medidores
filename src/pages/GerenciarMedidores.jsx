@@ -578,7 +578,7 @@ export default function GerenciarMedidores() {
       const printWindow = window.open('', '_blank')
       
       const qrCodesHtml = medidoresSelecionados.map(m => {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(m.token || m.id)}`
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(m.token || m.id)}`
         const tipoBadgeClass = m.tipo === 'agua' ? 'tipo-agua' : 'tipo-energia'
         const tipoLabel = m.tipo === 'agua' ? '💧 Água' : '⚡ Energia'
         return `
@@ -649,30 +649,30 @@ export default function GerenciarMedidores() {
             }
             
             .qr-card img {
-              width: 300px;
-              height: 300px;
-              margin-bottom: 30px;
-              border: 4px solid #333;
-              border-radius: 16px;
-              box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+              width: 180px;
+              height: 180px;
+              margin-bottom: 20px;
+              border: 2px solid #333;
+              border-radius: 12px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             }
             
             .metadata {
-              max-width: 400px;
+              max-width: 320px;
             }
             
             .metadata h3 {
-              font-size: 28px;
+              font-size: 18px;
               color: #1a1a1a;
-              margin-bottom: 20px;
+              margin-bottom: 12px;
               font-weight: 700;
             }
             
             .metadata p {
-              font-size: 18px;
+              font-size: 13px;
               color: #444;
-              margin: 10px 0;
-              line-height: 1.5;
+              margin: 6px 0;
+              line-height: 1.4;
             }
             
             .metadata p strong {
@@ -682,21 +682,21 @@ export default function GerenciarMedidores() {
             .token {
               font-family: 'Courier New', monospace;
               background: #f5f5f5;
-              padding: 12px 20px;
-              border-radius: 8px;
-              margin-top: 25px !important;
-              font-size: 14px !important;
-              border: 2px solid #ddd;
+              padding: 6px 12px;
+              border-radius: 6px;
+              margin-top: 12px !important;
+              font-size: 11px !important;
+              border: 1px solid #ddd;
               word-break: break-all;
             }
             
             .tipo-badge {
               display: inline-block;
-              padding: 8px 20px;
+              padding: 5px 14px;
               border-radius: 50px;
               font-weight: 600;
-              font-size: 16px;
-              margin-bottom: 15px;
+              font-size: 12px;
+              margin-bottom: 10px;
             }
             
             .tipo-agua {
@@ -720,11 +720,11 @@ export default function GerenciarMedidores() {
               }
               .qr-card { 
                 min-height: 100vh;
-                padding: 20px;
+                padding: 30px;
               }
               .qr-card img {
-                width: 280px;
-                height: 280px;
+                width: 180px;
+                height: 180px;
               }
             }
             
