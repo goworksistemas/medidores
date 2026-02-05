@@ -266,6 +266,7 @@ export default function GerenciarMedidores() {
   const [selectedItems, setSelectedItems] = useState([])
   const [showFilters, setShowFilters] = useState(true)
   const [exportando, setExportando] = useState(false)
+  const [confirmNovaUnidade, setConfirmNovaUnidade] = useState(null) // Modal para confirmar nova unidade
 
   // Filtros
   const [filtroTipo, setFiltroTipo] = useState('')
@@ -351,12 +352,15 @@ export default function GerenciarMedidores() {
 
   async function handleSave(medidorId) {
     try {
+      // Define a unidade de medida automaticamente baseado no tipo
+      const unidadeMedida = editForm.tipo === 'agua' ? 'm³' : 'kWh'
+      
       const { error } = await supabase
         .from('med_medidores')
         .update({
           nome: editForm.nome,
           tipo: editForm.tipo,
-          unidade: editForm.unidade,
+          unidade: unidadeMedida, // Unidade de MEDIDA (m³ ou kWh)
           local_unidade: editForm.local_unidade,
           andar: editForm.andar || null
         })
@@ -377,15 +381,26 @@ export default function GerenciarMedidores() {
     }
   }
 
-  async function handleAdd() {
+  // Verifica se a unidade (prédio) já existe
+  function verificarUnidadeExiste(localUnidade) {
+    if (!localUnidade || localUnidade.trim() === '') return true // Campo vazio, pode continuar
+    const unidadesExistentes = [...new Set(medidores.map(m => m.local_unidade?.toLowerCase()).filter(Boolean))]
+    return unidadesExistentes.includes(localUnidade.toLowerCase().trim())
+  }
+
+  // Função para adicionar medidor (chamada após confirmação)
+  async function adicionarMedidor() {
     try {
+      // Define a unidade de medida automaticamente baseado no tipo
+      const unidadeMedida = editForm.tipo === 'agua' ? 'm³' : 'kWh'
+      
       const { error } = await supabase
         .from('med_medidores')
         .insert({
           nome: editForm.nome,
           tipo: editForm.tipo,
-          unidade: editForm.unidade,
-          local_unidade: editForm.local_unidade,
+          unidade: unidadeMedida, // Unidade de MEDIDA (m³ ou kWh)
+          local_unidade: editForm.local_unidade, // Prédio/Local
           andar: editForm.andar || null,
           ativo: true // Novo medidor sempre é criado como ativo
           // O token é gerado automaticamente pelo banco de dados (default gen_random_uuid())
@@ -396,6 +411,7 @@ export default function GerenciarMedidores() {
       setMensagem({ tipo: 'sucesso', texto: 'Medidor adicionado com sucesso!' })
       setShowAddForm(false)
       setEditForm({})
+      setConfirmNovaUnidade(null)
       fetchMedidores()
       
       setTimeout(() => setMensagem(null), 3000)
@@ -404,6 +420,33 @@ export default function GerenciarMedidores() {
       setMensagem({ tipo: 'erro', texto: 'Erro ao adicionar medidor' })
       setTimeout(() => setMensagem(null), 3000)
     }
+  }
+
+  // Função principal de adicionar - verifica se unidade existe
+  async function handleAdd() {
+    const localUnidade = editForm.local_unidade?.trim()
+    
+    // Se tem unidade preenchida e ela não existe, pergunta se quer criar
+    if (localUnidade && !verificarUnidadeExiste(localUnidade)) {
+      setConfirmNovaUnidade({
+        unidade: localUnidade,
+        medidor: editForm.nome
+      })
+      return
+    }
+    
+    // Se a unidade existe ou está vazia, adiciona direto
+    await adicionarMedidor()
+  }
+
+  // Confirma criação de nova unidade
+  async function handleConfirmNovaUnidade() {
+    await adicionarMedidor()
+  }
+
+  // Cancela criação de nova unidade
+  function handleCancelNovaUnidade() {
+    setConfirmNovaUnidade(null)
   }
 
   async function handleDesativar(medidorId) {
@@ -536,13 +579,15 @@ export default function GerenciarMedidores() {
       const printWindow = window.open('', '_blank')
       
       const qrCodesHtml = medidoresSelecionados.map(m => {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(m.token || m.id)}`
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(m.token || m.id)}`
+        const tipoBadgeClass = m.tipo === 'agua' ? 'tipo-agua' : 'tipo-energia'
+        const tipoLabel = m.tipo === 'agua' ? '💧 Água' : '⚡ Energia'
         return `
           <div class="qr-card">
             <img src="${qrUrl}" alt="QR Code ${m.nome}" />
             <div class="metadata">
+              <span class="tipo-badge ${tipoBadgeClass}">${tipoLabel}</span>
               <h3>${m.nome}</h3>
-              <p><strong>Tipo:</strong> ${m.tipo === 'agua' ? '💧 Água' : '⚡ Energia'}</p>
               ${m.local_unidade ? `<p><strong>Prédio:</strong> ${m.local_unidade}</p>` : ''}
               ${m.andar ? `<p><strong>Andar:</strong> ${m.andar}</p>` : ''}
               ${m.unidade ? `<p><strong>Unidade:</strong> ${m.unidade}</p>` : ''}
@@ -559,67 +604,145 @@ export default function GerenciarMedidores() {
           <title>QR Codes - Medidores</title>
           <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
+            
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
+            
             body { 
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              padding: 20px;
-              background: #f5f5f5;
-            }
-            h1 { text-align: center; margin-bottom: 30px; color: #333; }
-            .container {
-              display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-              gap: 20px;
-              max-width: 1200px;
-              margin: 0 auto;
-            }
-            .qr-card {
               background: white;
-              border-radius: 12px;
-              padding: 20px;
+            }
+            
+            .header {
               text-align: center;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-              page-break-inside: avoid;
+              padding: 20px 0;
+              border-bottom: 2px solid #e0e0e0;
+              margin-bottom: 0;
             }
-            .qr-card img {
-              width: 180px;
-              height: 180px;
-              margin-bottom: 15px;
-              border: 2px solid #eee;
-              border-radius: 8px;
-            }
-            .metadata h3 {
-              font-size: 16px;
+            
+            .header h1 {
+              font-size: 24px;
               color: #333;
-              margin-bottom: 10px;
+              margin-bottom: 8px;
             }
-            .metadata p {
+            
+            .header p {
               font-size: 12px;
               color: #666;
-              margin: 4px 0;
             }
+            
+            .qr-card {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              min-height: calc(100vh - 120px);
+              padding: 40px 20px;
+              text-align: center;
+              page-break-after: always;
+              page-break-inside: avoid;
+            }
+            
+            .qr-card:last-child {
+              page-break-after: auto;
+            }
+            
+            .qr-card img {
+              width: 300px;
+              height: 300px;
+              margin-bottom: 30px;
+              border: 4px solid #333;
+              border-radius: 16px;
+              box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            }
+            
+            .metadata {
+              max-width: 400px;
+            }
+            
+            .metadata h3 {
+              font-size: 28px;
+              color: #1a1a1a;
+              margin-bottom: 20px;
+              font-weight: 700;
+            }
+            
+            .metadata p {
+              font-size: 18px;
+              color: #444;
+              margin: 10px 0;
+              line-height: 1.5;
+            }
+            
+            .metadata p strong {
+              color: #222;
+            }
+            
             .token {
-              font-family: monospace;
-              background: #f0f0f0;
-              padding: 4px 8px;
-              border-radius: 4px;
-              margin-top: 10px !important;
-              font-size: 11px !important;
+              font-family: 'Courier New', monospace;
+              background: #f5f5f5;
+              padding: 12px 20px;
+              border-radius: 8px;
+              margin-top: 25px !important;
+              font-size: 14px !important;
+              border: 2px solid #ddd;
+              word-break: break-all;
             }
+            
+            .tipo-badge {
+              display: inline-block;
+              padding: 8px 20px;
+              border-radius: 50px;
+              font-weight: 600;
+              font-size: 16px;
+              margin-bottom: 15px;
+            }
+            
+            .tipo-agua {
+              background: linear-gradient(135deg, #0EA5E9, #0284C7);
+              color: white;
+            }
+            
+            .tipo-energia {
+              background: linear-gradient(135deg, #F59E0B, #D97706);
+              color: white;
+            }
+            
             @media print {
-              body { background: white; padding: 10px; }
-              .qr-card { box-shadow: none; border: 1px solid #ddd; }
+              body { 
+                background: white;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              .header {
+                position: running(header);
+              }
+              .qr-card { 
+                min-height: 100vh;
+                padding: 20px;
+              }
+              .qr-card img {
+                width: 280px;
+                height: 280px;
+              }
+            }
+            
+            @media screen {
+              .qr-card {
+                border-bottom: 2px dashed #ccc;
+                margin-bottom: 20px;
+              }
             }
           </style>
         </head>
         <body>
-          <h1>QR Codes dos Medidores</h1>
-          <p style="text-align: center; color: #666; margin-bottom: 30px;">
-            Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
-            • Total: ${medidoresSelecionados.length} medidor(es)
-          </p>
-          <div class="container">
-            ${qrCodesHtml}
+          <div class="header">
+            <h1>QR Codes dos Medidores</h1>
+            <p>Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')} • Total: ${medidoresSelecionados.length} medidor(es)</p>
           </div>
+          ${qrCodesHtml}
           <script>
             // Aguarda imagens carregarem antes de imprimir
             Promise.all(
@@ -809,22 +932,12 @@ export default function GerenciarMedidores() {
                   onChange={(e) => setEditForm({ ...editForm, tipo: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="agua">Água</option>
-                  <option value="energia">Energia</option>
+                  <option value="agua">💧 Água (m³)</option>
+                  <option value="energia">⚡ Energia (kWh)</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Unidade</label>
-                <input
-                  type="text"
-                  value={editForm.unidade}
-                  onChange={(e) => setEditForm({ ...editForm, unidade: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ex: Unidade 1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Prédio/Local</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Prédio/Local *</label>
                 <input
                   type="text"
                   value={editForm.local_unidade}
@@ -1295,6 +1408,64 @@ export default function GerenciarMedidores() {
         )}
 
       </div>
+
+      {/* Modal de Confirmação de Nova Unidade */}
+      {confirmNovaUnidade && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={handleCancelNovaUnidade}>
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                  <Building className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Nova Unidade Detectada</h2>
+                  <p className="text-sm text-amber-100">Esta unidade ainda não existe no sistema</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-amber-900 mb-3">
+                  A unidade <strong className="text-amber-700">"{confirmNovaUnidade.unidade}"</strong> não foi encontrada no sistema.
+                </p>
+                <p className="text-sm text-amber-700">
+                  Deseja criar esta nova unidade ao cadastrar o medidor <strong>"{confirmNovaUnidade.medidor}"</strong>?
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="text-sm text-blue-800">
+                  <strong>💡 Dica:</strong> Ao confirmar, a unidade será criada automaticamente e poderá ser usada em futuros cadastros de medidores.
+                </p>
+              </div>
+            </div>
+
+            {/* Botões */}
+            <div className="bg-gray-50 border-t border-gray-200 p-4 flex gap-3 justify-end">
+              <button
+                onClick={handleCancelNovaUnidade}
+                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmNovaUnidade}
+                className="px-6 py-2 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition-colors flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Criar Unidade e Cadastrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Detalhes */}
       {modalDetalhes && (
